@@ -5,17 +5,9 @@ const config = require('../config');
 // 使用内存存储 session（生产环境可改用 Redis/Prisma）
 const sessionStorage = new Map();
 
-const shopify = shopifyApi({
-  apiKey: config.shopify.apiKey,
-  apiSecretKey: config.shopify.apiSecret,
-  scopes: config.shopify.scopes,
-  hostName: new URL(config.shopify.appUrl).host,
-  hostScheme: 'https',
-  apiVersion: LATEST_API_VERSION,
-  isCustomStoreApp: false,
-  isEmbeddedApp: false,
-  // 自定义 session 存储
-  sessionStorage: {
+// 创建 session 存储适配器
+function createSessionStorage() {
+  return {
     storeSession: async (session) => {
       sessionStorage.set(session.id, session);
       return true;
@@ -34,7 +26,28 @@ const shopify = shopifyApi({
       }
       return sessions;
     },
-  },
-});
+  };
+}
 
-module.exports = { shopify, sessionStorage };
+/**
+ * 根据 apiKey 和 apiSecret 创建 Shopify SDK 实例
+ * 支持多 Custom App 凭证
+ */
+function createShopify(apiKey, apiSecret) {
+  return shopifyApi({
+    apiKey,
+    apiSecretKey: apiSecret,
+    scopes: config.shopify.scopes,
+    hostName: new URL(config.shopify.appUrl).host,
+    hostScheme: 'https',
+    apiVersion: LATEST_API_VERSION,
+    isCustomStoreApp: false,
+    isEmbeddedApp: false,
+    sessionStorage: createSessionStorage(),
+  });
+}
+
+// 全局默认实例（向后兼容：使用环境变量中的全局凭证）
+const shopify = createShopify(config.shopify.apiKey, config.shopify.apiSecret);
+
+module.exports = { shopify, createShopify, sessionStorage };

@@ -3,7 +3,7 @@ const axios = require('axios');
 const config = require('../config');
 const shopifyService = require('../services/shopify');
 const prisma = require('../utils/db');
-const { shopify } = require('../utils/shopify-api');
+const { shopify, createShopify } = require('../utils/shopify-api');
 
 const router = express.Router();
 
@@ -24,7 +24,16 @@ router.get('/auth', async (req, res) => {
   }
 
   try {
-    const authUrl = await shopify.auth.begin({
+    // 根据店铺查找对应的 Custom App 凭证，支持多应用
+    const shopRecord = await prisma.shop.findUnique({
+      where: { shopDomain },
+    });
+
+    const apiKey = shopRecord?.apiKey || config.shopify.apiKey;
+    const apiSecret = shopRecord?.apiSecret || config.shopify.apiSecret;
+    const shopifyInstance = createShopify(apiKey, apiSecret);
+
+    const authUrl = await shopifyInstance.auth.begin({
       shop: shopDomain,
       callbackPath: '/api/shopify/callback',
       isOnline: false,
@@ -47,7 +56,19 @@ router.get('/auth', async (req, res) => {
  */
 router.get('/callback', async (req, res) => {
   try {
-    const callbackResponse = await shopify.auth.callback({
+    // 从回调请求中获取 shop 域名，用于查找对应的应用凭证
+    const shopDomain = req.query.shop?.toLowerCase().trim();
+
+    // 根据店铺查找对应的 Custom App 凭证
+    const shopRecord = shopDomain
+      ? await prisma.shop.findUnique({ where: { shopDomain } })
+      : null;
+
+    const apiKey = shopRecord?.apiKey || config.shopify.apiKey;
+    const apiSecret = shopRecord?.apiSecret || config.shopify.apiSecret;
+    const shopifyInstance = createShopify(apiKey, apiSecret);
+
+    const callbackResponse = await shopifyInstance.auth.callback({
       rawRequest: req,
       rawResponse: res,
       isOnline: false,

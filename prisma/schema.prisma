@@ -18,6 +18,11 @@ model Shop {
   name          String?
   plan          String?
   isActive      Boolean  @default(true) @map("is_active")
+
+  // === 多应用凭证支持（v2.1.0）：每个店铺可绑定独立的 Custom App 凭证 ===
+  apiKey        String?  @map("api_key")
+  apiSecret     String?  @map("api_secret")
+
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
