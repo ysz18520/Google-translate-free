@@ -69,7 +69,7 @@ router.get('/config', async (req, res) => {
 
   const defaultConfig = {
     position: config.widget.position || 'bottom-right',
-    color: '#1976d2',
+    color: '#22c55e',
     languages: BUILTIN_LANGUAGES.map(l => ({ code: l.code, name: l.name, flag: l.flag })),
     enabledLanguages: 'en,es,fr,ara,zh',
   };
@@ -127,7 +127,7 @@ router.post('/config', async (req, res) => {
     finalEnabledLanguages = enabledCodes.join(',');
 
     const updateData = {};
-    if (position) updateData.widgetPosition = position;
+    if (position !== undefined) updateData.widgetPosition = position;
     if (color) updateData.widgetColor = color;
     if (enabledLanguages) {
       updateData.enabledLanguages = finalEnabledLanguages;
@@ -140,7 +140,7 @@ router.post('/config', async (req, res) => {
       update: updateData,
       create: {
         shopId: shopRecord.id,
-        widgetPosition: position || 'bottom-right',
+        widgetPosition: position !== undefined ? position : 'bottom-right',
         widgetColor: color || '#1976d2',
         enabledLanguages: finalEnabledLanguages,
         activeLanguages: finalEnabledLanguages,

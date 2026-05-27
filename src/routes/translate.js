@@ -1,5 +1,4 @@
 const express = require('express');
-const { testConnection } = require('../services/translator');
 const { encrypt, decrypt } = require('../utils/crypto');
 const prisma = require('../utils/db');
 
@@ -147,50 +146,6 @@ router.get('/config', async (req, res) => {
   } catch (error) {
     console.error('[Translate Config Get Error]', error.message);
     res.status(500).json({ error: 'Failed to get config', details: error.message });
-  }
-});
-
-/**
- * @route POST /api/translate/test-connection
- * @desc 测试翻译引擎连通性
- */
-router.post('/test-connection', async (req, res) => {
-  const { provider, apiKey, apiSecret, model, endpoint, shop } = req.body;
-
-  if (!provider) {
-    return res.status(400).json({ error: 'Missing provider parameter' });
-  }
-
-  try {
-    let credentials = {
-      apiKey,
-      apiSecret,
-      model,
-      endpoint,
-    };
-
-    if (!apiKey && shop) {
-      const shopRecord = await prisma.shop.findUnique({
-        where: { shopDomain: shop },
-      });
-      if (shopRecord) {
-        const setting = await prisma.shopSetting.findUnique({
-          where: { shopId: shopRecord.id },
-        });
-        if (setting && setting.translateApiKey) {
-          credentials.apiKey = decrypt(setting.translateApiKey);
-          credentials.apiSecret = setting.translateApiSecret ? decrypt(setting.translateApiSecret) : undefined;
-          credentials.model = setting.translateModel || undefined;
-          credentials.endpoint = setting.translateEndpoint || undefined;
-        }
-      }
-    }
-
-    const result = await testConnection(provider, credentials);
-    res.json(result);
-  } catch (error) {
-    console.error('[Test Connection Error]', error.message);
-    res.status(500).json({ error: 'Test failed', details: error.message });
   }
 });
 

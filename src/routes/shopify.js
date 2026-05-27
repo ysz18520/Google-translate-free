@@ -112,7 +112,7 @@ router.get('/callback', async (req, res) => {
       create: {
         shopId: shopData.id,
         widgetPosition: config.widget.position,
-        widgetColor: '#1976d2',
+        widgetColor: '#22c55e',
         activeLanguages: 'en,es,fr,ara,zh',
       },
     });

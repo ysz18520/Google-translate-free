@@ -14,3 +14,4 @@ coverage/
 *.seed
 *.pid.lock
 部署信息.md
+.claude/settings.local.json

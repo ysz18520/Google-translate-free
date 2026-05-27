@@ -482,6 +482,22 @@
 
     <!-- 概览页 -->
     <div id="tab-dashboard" class="tab-content">
+      <!-- 产品介绍 -->
+      <div class="card">
+        <div class="card-title">AutoTranslate Pro 简介</div>
+        <p style="font-size:14px;color:#555;line-height:1.8;margin-bottom:12px;">
+          专为 Shopify 店铺打造的多语言翻译插件。基于 Google Translate 免费组件，在前端实时翻译页面内容，无需 API 密钥、无需预翻译、零成本使用。
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:12px;">
+          <span class="badge badge-success">100+ 种语言</span>
+          <span class="badge badge-info">零成本</span>
+          <span class="badge badge-info">实时翻译</span>
+          <span class="badge badge-info">RTL 支持</span>
+          <span class="badge badge-info">自动语言检测</span>
+        </div>
+      </div>
+
+      <!-- 店铺信息 -->
       <div class="card">
         <div class="card-title">店铺信息</div>
         <div class="info-grid">
@@ -504,14 +520,24 @@
         </div>
       </div>
 
+      <!-- 使用说明 -->
       <div class="card">
-        <div class="card-title">支持语言</div>
-        <div id="language-list">
-          <span class="lang-tag active">🇺🇸 英文</span>
-          <span class="lang-tag">🇪🇸 西班牙文</span>
-          <span class="lang-tag">🇫🇷 法文</span>
-          <span class="lang-tag">🇸🇦 阿拉伯文</span>
-          <span class="lang-tag">🇨🇳 中文</span>
+        <div class="card-title">使用说明</div>
+        <div style="font-size:14px;color:#555;line-height:1.8;">
+          <p style="margin-bottom:10px;"><strong>1.</strong> 安装完成后，语言切换器会自动出现在店铺前台右下角（可在「设置」中调整位置或隐藏）。</p>
+          <p style="margin-bottom:10px;"><strong>2.</strong> 顾客首次访问默认展示网站原文，需要翻译时点击切换器手动选择目标语言。</p>
+          <p style="margin-bottom:10px;"><strong>3.</strong> 在「设置」页可调整悬浮按钮位置、主题色、启用/禁用语言、添加自定义语言。</p>
+          <p><strong>4.</strong> 支持阿拉伯语 RTL（从右到左）布局自动切换。</p>
+        </div>
+      </div>
+
+      <!-- 注意事项 -->
+      <div class="card" style="border-left:4px solid #ff9800;">
+        <div class="card-title">注意事项</div>
+        <div style="padding:12px 16px;background:#fff8e1;border-radius:8px;font-size:14px;color:#555;line-height:1.8;">
+          <p style="margin:0;">
+            <strong>网络要求：</strong>本插件依赖 Google Translate 服务。中国大陆用户需要开启 VPN / 代理才能正常使用翻译功能；海外用户可直接正常使用，无需额外配置。
+          </p>
         </div>
       </div>
     </div>
@@ -553,6 +579,7 @@
           <select class="form-select" id="setting-position">
             <option value="bottom-right">右下角</option>
             <option value="bottom-left">左下角</option>
+            <option value="hidden">隐藏</option>
           </select>
         </div>
         <div class="form-group">

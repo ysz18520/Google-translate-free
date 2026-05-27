@@ -11,7 +11,7 @@
 
   const defaultConfig = {
     position: 'bottom-right',
-    color: '#1976d2',
+    color: '#22c55e',
     languages: [
       { code: 'en', name: 'English', flag: '🇺🇸' },
       { code: 'es', name: 'Español', flag: '🇪🇸' },
@@ -158,29 +158,36 @@
   // Google Translate 集成
   // ==========================================================
 
-  function loadGoogleTranslateScript() {
+  const GOOGLE_TRANSLATE_URLS = [
+    'https://translate.google.com/translate_a/element.js',
+    'https://www.google.com/jsapi',
+  ];
+
+  function loadGoogleTranslateScript(attempt = 0) {
     return new Promise((resolve, reject) => {
       if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+        googleLoaded = true;
         resolve();
         return;
       }
 
-      // 避免重复加载
-      if (document.querySelector('script[src*="translate.google.com/translate_a/element.js"]')) {
-        // 等待加载完成
+      // 避免重复加载：已有脚本在加载中，等待即可
+      if (document.querySelector('script[src*="translate_a/element.js"]')) {
         const check = setInterval(() => {
           if (window.google && window.google.translate && window.google.translate.TranslateElement) {
             clearInterval(check);
+            googleLoaded = true;
             resolve();
           }
         }, 100);
         setTimeout(() => {
           clearInterval(check);
           reject(new Error('Google Translate script timeout'));
-        }, 10000);
+        }, 15000);
         return;
       }
 
+      // 注册全局回调
       window.googleTranslateElementInit = function () {
         const container = document.getElementById('google_translate_element');
         if (!container) return;
@@ -188,7 +195,6 @@
         new google.translate.TranslateElement({
           pageLanguage: sourceLanguage === 'zh' ? 'zh-CN' : sourceLanguage,
           includedLanguages: config.languages.map(l => GOOGLE_LANG_MAP[l.code] || l.code).join(','),
-          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
         }, 'google_translate_element');
 
         googleLoaded = true;
@@ -196,46 +202,101 @@
       };
 
       const script = document.createElement('script');
-      script.src = `https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit`;
+      script.src = `${GOOGLE_TRANSLATE_URLS[0]}?cb=googleTranslateElementInit`;
       script.async = true;
-      script.onerror = () => reject(new Error('Failed to load Google Translate script'));
+      script.onerror = () => {
+        // 移除失败脚本标签
+        script.remove();
+        if (attempt < 3) {
+          console.warn(`[Translator] Google Translate load failed, retrying (${attempt + 1}/3)...`);
+          setTimeout(() => {
+            loadGoogleTranslateScript(attempt + 1).then(resolve).catch(reject);
+          }, 2000);
+        } else {
+          reject(new Error('Failed to load Google Translate script after retries'));
+        }
+      };
       document.head.appendChild(script);
     });
   }
 
   function triggerGoogleTranslate(langCode) {
-    if (!googleLoaded) {
-      console.warn('[Translator] Google Translate not loaded yet');
-      return false;
-    }
+    return new Promise((resolve) => {
+      if (!googleLoaded) {
+        resolve(false);
+        return;
+      }
 
-    const googleCode = GOOGLE_LANG_MAP[langCode] || langCode;
+      const googleCode = GOOGLE_LANG_MAP[langCode] || langCode;
 
-    // 找到 Google 的下拉选择框
-    const combo = document.querySelector('.goog-te-combo');
-    if (!combo) {
-      console.warn('[Translator] Google Translate combo not found');
-      return false;
-    }
+      function tryTrigger(retryCount = 0) {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) {
+          if (retryCount < 20) {
+            setTimeout(() => tryTrigger(retryCount + 1), 300);
+            return;
+          }
+          console.warn('[Translator] Google Translate combo not found after retries');
+          resolve(false);
+          return;
+        }
 
-    if (combo.value === googleCode) {
-      return true; // 已经是目标语言
-    }
+        if (combo.value === googleCode) {
+          resolve(true);
+          return;
+        }
 
-    combo.value = googleCode;
-    combo.dispatchEvent(new Event('change'));
-    return true;
+        combo.value = googleCode;
+        const evt = document.createEvent('HTMLEvents');
+        evt.initEvent('change', true, false);
+        combo.dispatchEvent(evt);
+
+        // 验证：combo.value 是否真的变成了目标值（如果没有对应 option，设置不会生效）
+        if (combo.value !== googleCode) {
+          console.warn(`[Translator] Option ${googleCode} not found in Google Translate combo`);
+          resolve(false);
+          return;
+        }
+        resolve(true);
+      }
+
+      tryTrigger();
+    });
   }
 
   function restoreOriginalLanguage() {
-    // 恢复到原文：将 Google 下拉框设为空或源语言
-    const combo = document.querySelector('.goog-te-combo');
-    if (!combo) return false;
+    return new Promise((resolve) => {
+      function tryRestore(retryCount = 0) {
+        const combo = document.querySelector('.goog-te-combo');
+        if (!combo) {
+          if (retryCount < 20) {
+            setTimeout(() => tryRestore(retryCount + 1), 300);
+            return;
+          }
+          resolve(false);
+          return;
+        }
 
-    // 空值表示"原文"（Original）
-    combo.value = '';
-    combo.dispatchEvent(new Event('change'));
-    return true;
+        combo.value = '';
+        const evt = document.createEvent('HTMLEvents');
+        evt.initEvent('change', true, false);
+        combo.dispatchEvent(evt);
+
+        // 清除 Google Translate cookie，防止刷新后再次自动翻译
+        const domain = window.location.hostname;
+        document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+        document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=' + domain;
+        document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/; domain=.' + domain;
+
+        document.body.style.top = '';
+        document.body.style.position = '';
+        document.documentElement.style.top = '';
+
+        resolve(true);
+      }
+
+      tryRestore();
+    });
   }
 
   // ==========================================================
@@ -250,14 +311,23 @@
       /* 隐藏 Google Translate 默认 UI */
       .goog-te-banner-frame,
       .goog-te-gadget,
+      .goog-te-gadget-simple,
       .skiptranslate,
       #goog-gt-tt,
       .goog-te-menu-value,
+      .goog-te-menu-frame,
       .goog-te-balloon-frame,
+      .goog-tooltip,
+      .goog-tooltip:hover,
       #goog-gt-\.tt {
         display: none !important;
+        visibility: hidden !important;
       }
       body {
+        top: 0 !important;
+        position: static !important;
+      }
+      html {
         top: 0 !important;
       }
 
@@ -464,7 +534,10 @@
   function createWidget() {
     if ($(`#${WIDGET_ID}`)) return;
 
-    const container = createEl('div', `position-${config.position}`);
+    // 隐藏模式：不创建 widget
+    if (config.position === 'hidden') return;
+
+    const container = createEl('div', `position-${config.position} notranslate`);
     container.id = WIDGET_ID;
 
     const btn = createEl('button', `${WIDGET_ID}-btn`);
@@ -562,30 +635,46 @@
     toggleDropdown();
     showLoading();
 
-    currentLang = langCode;
-    localStorage.setItem('coollaa_lang', JSON.stringify({ code: langCode, source: 'manual' }));
-    updateWidgetActiveLang(langCode);
+    const startTime = Date.now();
+    let success = false;
 
-    // 触发 Google Translate
-    if (langCode === sourceLanguage) {
-      restoreOriginalLanguage();
-      setPageDirection(sourceLanguage);
-    } else {
-      const ok = triggerGoogleTranslate(langCode);
-      if (!ok) {
-        console.warn('[Translator] Google Translate trigger failed, will retry...');
-        // 如果还没加载完，等一会儿再试
-        setTimeout(() => {
-          triggerGoogleTranslate(langCode);
-        }, 2000);
+    try {
+      if (!googleLoaded) {
+        console.warn('[Translator] Google not ready, attempting reload...');
+        await loadGoogleTranslateScript();
       }
-      setPageDirection(langCode);
+      success = await triggerGoogleTranslate(langCode);
+    } catch (err) {
+      console.error('[Translator] Translation failed:', err.message);
+      success = false;
     }
 
-    // Google Translate 翻译是异步的，短暂显示 loading 后隐藏
-    setTimeout(() => {
-      hideLoading();
-    }, 800);
+    // 保证 loading 至少显示 600ms，让用户看到动画反馈
+    const elapsed = Date.now() - startTime;
+    const minLoading = 600;
+    const remaining = Math.max(0, minLoading - elapsed);
+
+    await new Promise(r => setTimeout(r, remaining));
+
+    if (success) {
+      currentLang = langCode;
+      localStorage.setItem('coollaa_lang', JSON.stringify({ code: langCode, source: 'manual' }));
+      updateWidgetActiveLang(langCode);
+      setPageDirection(langCode);
+    } else {
+      console.error('[Translator] Switch failed, reverting UI');
+      updateWidgetActiveLang(currentLang);
+      const btn = document.querySelector(`.${WIDGET_ID}-btn`);
+      if (btn) {
+        const originalBg = btn.style.background;
+        btn.style.background = '#f44336';
+        setTimeout(() => {
+          btn.style.background = originalBg || config.color;
+        }, 800);
+      }
+    }
+
+    hideLoading();
   }
 
   // ==========================================================
@@ -603,9 +692,10 @@
     await fetchConfig();
 
     // 创建隐藏容器供 Google Translate 初始化
-    const hiddenContainer = createEl('div', '');
+    // 注意：不能用 display:none，Google Translate 在隐藏元素中无法正确初始化 .goog-te-combo
+    const hiddenContainer = createEl('div', 'notranslate');
     hiddenContainer.id = 'google_translate_element';
-    hiddenContainer.style.display = 'none';
+    hiddenContainer.style.cssText = 'position:absolute;left:-9999px;top:-9999px;overflow:hidden;height:0;width:0;';
     document.body.appendChild(hiddenContainer);
 
     // 先创建 UI
@@ -621,15 +711,53 @@
       await loadGoogleTranslateScript();
       console.log('[Coollaa Translator] Google Translate loaded');
 
-      // 如果初始语言不是源语言，触发翻译
-      if (currentLang !== sourceLanguage) {
-        setPageDirection(currentLang);
-        setTimeout(() => {
+      // Google Translate 会通过 cookie 记忆用户上次选择的语言，
+      // 刷新后可能自动恢复翻译。需要检测并同步 widget 状态。
+      setTimeout(() => {
+        const combo = document.querySelector('.goog-te-combo');
+        if (combo && combo.value) {
+          const googleCode = combo.value;
+          const reverseMap = {
+            'en': 'en', 'es': 'es', 'fr': 'fr',
+            'ar': 'ara', 'zh-CN': 'zh', 'zh': 'zh',
+          };
+          const detectedLang = reverseMap[googleCode] || googleCode;
+          if (detectedLang !== sourceLanguage && config.languages.some(l => l.code === detectedLang)) {
+            currentLang = detectedLang;
+            updateWidgetActiveLang(currentLang);
+            setPageDirection(currentLang);
+            localStorage.setItem('coollaa_lang', JSON.stringify({ code: currentLang, source: 'manual' }));
+            console.log(`[Coollaa Translator] Synced Google active language: ${currentLang}`);
+            return;
+          }
+        }
+
+        // 如果 Google 没有活跃翻译，且初始语言不是源语言，触发翻译
+        if (currentLang !== sourceLanguage) {
+          setPageDirection(currentLang);
           triggerGoogleTranslate(currentLang);
-        }, 300);
-      }
+        }
+      }, 500);
     } catch (err) {
       console.error('[Coollaa Translator] Failed to load Google Translate:', err.message);
+      // 初始加载失败，延迟后静默重试一次（网络可能暂时不通）
+      setTimeout(() => {
+        loadGoogleTranslateScript().then(() => {
+          console.log('[Coollaa Translator] Google Translate loaded on retry');
+          // 重试成功后，如果用户之前手动选择了非源语言，触发翻译
+          const saved = localStorage.getItem('coollaa_lang');
+          let savedLang = null;
+          try { savedLang = JSON.parse(saved)?.code; } catch (e) { savedLang = saved; }
+          if (savedLang && savedLang !== sourceLanguage) {
+            triggerGoogleTranslate(savedLang);
+            setPageDirection(savedLang);
+            currentLang = savedLang;
+            updateWidgetActiveLang(savedLang);
+          }
+        }).catch(() => {
+          console.error('[Coollaa Translator] Google Translate retry also failed');
+        });
+      }, 5000);
     }
 
     console.log(`[Coollaa Translator] Ready. Current language: ${currentLang}`);

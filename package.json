@@ -1,6 +1,6 @@
 {
   "name": "shopify-translator-app",
-  "version": "1.2.1",
+  "version": "2.0.0",
   "description": "Shopify 多语言翻译插件",
   "main": "src/server.js",
   "scripts": {

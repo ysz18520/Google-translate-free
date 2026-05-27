@@ -1,24 +1,24 @@
 # Coollaa Shopify 多语言翻译插件
 
-> 版本：v1.2.1
+> 版本：v2.0.0
 
-Shopify 店铺一站式多语言解决方案，支持英语、西班牙语、法语、阿拉伯语、中文。
+Shopify 店铺一站式多语言解决方案，基于 Google Translate 免费网页组件，零成本、支持 100+ 种语言。
 
 ## 功能特性
 
-- **OAuth 授权**：完整的 Shopify App 授权流程，HMAC 签名校验
-- **前端悬浮切换器**：右下角/左下角固定悬浮，支持品牌图标，下拉选择器
-- **动态文本替换**：切换语言时不保留原文，直接替换页面文本
-- **批量翻译**：支持商品、页面、博客批量翻译
-- **翻译缓存**：减少 API 调用，降低成本
+- **OAuth 授权**：完整的 Shopify App 授权流程
+- **前端悬浮切换器**：右下角/左下角/隐藏三种模式，下拉语言选择器
+- **Google Translate 免费组件**：零成本实时翻译，支持 100+ 种语言
+- **套壳自定义 UI**：隐藏 Google 默认横幅，使用品牌一致的悬浮按钮
 - **RTL 支持**：阿拉伯语自动启用从右到左布局
+- **语言持久化**：localStorage 记住用户选择
 - **响应式适配**：PC 端和移动端自适应
 
 ## 技术栈
 
 - 后端：Node.js + Express
 - 数据库：MySQL（Prisma ORM）
-- 翻译 API：百度翻译 API
+- 翻译引擎：Google Translate 免费网页组件（前端实时翻译，零成本）
 - 前端：纯 HTML/CSS/JS（管理后台）+ 注入脚本（店铺前端）
 
 ## 项目结构
@@ -36,14 +36,11 @@ shopify插件开发/
 │   ├── config/
 │   │   └── index.js        # 配置读取
 │   ├── routes/
-│   │   ├── shopify.js      # Shopify OAuth、商品/页面读取
-│   │   ├── translate.js    # 翻译 API
+│   │   ├── shopify.js      # Shopify OAuth、店铺数据读取
+│   │   ├── translate.js    # 翻译引擎配置
 │   │   └── widget.js       # 前端小部件配置
-│   ├── services/
-│   │   ├── baidu.js        # 百度翻译 API 封装
-│   │   └── shopify.js      # Shopify Admin API 封装
-│   └── utils/
-│       └── hmac.js         # HMAC 签名校验
+│   └── services/
+│       └── shopify.js      # Shopify Admin API 封装
 └── public/
     ├── widget.js           # 店铺前端语言切换器脚本
     └── translator/
@@ -157,15 +154,17 @@ location /api/ {
 - `GET /api/shopify/pages?shop=xxx` - 获取页面列表
 
 ### 翻译
-- `POST /api/translate/text` - 单文本翻译
-- `POST /api/translate/batch` - 批量翻译
-- `GET /api/translate/languages` - 获取支持语言
-- `POST /api/translate/product` - 翻译商品
+- `GET /api/translate/languages` - 获取支持语言列表
+- `GET /api/translate/config?shop=xxx` - 获取翻译引擎配置
+- `POST /api/translate/config` - 保存翻译引擎配置
 
 ### 小部件配置
 - `GET /api/widget/config?shop=xxx` - 获取配置
 - `POST /api/widget/config` - 更新配置
-- `GET /api/widget/translations?shop=xxx&locale=xx` - 获取翻译内容
+
+### 调试
+- `POST /api/widget/debug-auth` - 生成店主调试授权 token
+- `GET /api/widget/verify-debug?shop=xxx&token=xxx` - 验证调试 token
 
 ### 前端脚本
 - `GET /translator-widget.js` - 店铺语言切换器脚本
@@ -174,19 +173,18 @@ location /api/ {
 
 - [x] 基础框架搭建 + .env 配置
 - [x] Shopify OAuth 授权流程
-- [x] 百度翻译 API 对接
-- [x] 读取店铺商品列表并批量翻译
+- [x] Google Translate 免费组件集成（前端实时翻译）
 - [x] 前端翻译脚本注入（ScriptTag）
 - [x] 前端语言切换器 UI（悬浮组件）
-- [ ] 管理页面完善（用量统计、缓存管理）
-- [ ] 数据库持久化（当前使用内存存储）
-- [ ] 翻译结果写回 Shopify
+- [x] 管理后台（店铺信息、设置页）
+- [x] 数据库持久化（MySQL + Prisma）
+- [ ] 多店铺支持
 
 ## 注意事项
 
-1. 当前店铺信息存储在内存中，重启服务会丢失，生产环境请接入 MySQL
-2. 百度翻译 API 有 QPS 限制，批量翻译会自动限流
-3. 前端脚本通过 Shopify ScriptTag 自动注入，授权后即可生效
+1. 前端脚本通过 Shopify ScriptTag 自动注入，授权后即可生效
+2. 国内用户需开启 VPN 以确保 Google Translate API 正常加载
+3. 如需添加更多语言，可在管理后台设置页通过「自定义语言」扩展
 
 ## 许可证
 

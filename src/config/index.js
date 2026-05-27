@@ -19,11 +19,6 @@ module.exports = {
     ],
   },
 
-  baidu: {
-    appId: process.env.BAIDU_APP_ID,
-    secretKey: process.env.BAIDU_SECRET_KEY,
-  },
-
   session: {
     secret: process.env.SESSION_SECRET || 'default-secret-change-me',
   },
