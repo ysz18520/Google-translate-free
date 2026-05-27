@@ -220,6 +220,7 @@ router.get('/shop', async (req, res) => {
       plan: shopData.plan,
       scope: shopData.scope,
       isActive: shopData.isActive,
+      isAdmin: shopData.isAdmin,
     });
   } catch (error) {
     console.error('[Get Shop Error]', error.message);
@@ -295,6 +296,123 @@ router.get('/pages', async (req, res) => {
   } catch (error) {
     console.error('[Get Pages Error]', error.message);
     res.status(500).json({ error: 'Failed to fetch pages', details: error.message });
+  }
+});
+
+// 内置管理员店铺（兜底白名单，用于首次部署时还没有 isAdmin 标记的情况）
+const ADMIN_SHOPS = ['215c1a-3.myshopify.com', 'coollaa.myshopify.com'];
+
+/**
+ * @route POST /api/shopify/admin/register-shop
+ * @desc 管理员注册新店铺（配置该店铺使用独立的 Custom App 凭证）
+ * @access Admin only
+ */
+router.post('/admin/register-shop', async (req, res) => {
+  const { shop, targetShop, apiKey, apiSecret, grantAdmin } = req.body;
+
+  if (!shop || !targetShop || !apiKey || !apiSecret) {
+    return res.status(400).json({ error: 'Missing required fields: shop, targetShop, apiKey, apiSecret' });
+  }
+
+  // 校验目标店铺域名格式
+  const targetDomain = targetShop.toLowerCase().trim();
+  if (!targetDomain.endsWith('.myshopify.com')) {
+    return res.status(400).json({ error: 'Invalid target shop domain' });
+  }
+
+  try {
+    // 1. 校验调用者是否为管理员
+    const callerShop = await prisma.shop.findUnique({
+      where: { shopDomain: shop.toLowerCase().trim() },
+    });
+
+    const isCallerAdmin = callerShop?.isAdmin || ADMIN_SHOPS.includes(shop.toLowerCase().trim());
+    if (!isCallerAdmin) {
+      return res.status(403).json({ error: 'Forbidden: admin access required' });
+    }
+
+    // 2. upsert 目标店铺
+    const upserted = await prisma.shop.upsert({
+      where: { shopDomain: targetDomain },
+      update: {
+        apiKey,
+        apiSecret,
+        isAdmin: !!grantAdmin,
+        updatedAt: new Date(),
+      },
+      create: {
+        shopDomain: targetDomain,
+        accessToken: '',
+        apiKey,
+        apiSecret,
+        isAdmin: !!grantAdmin,
+      },
+    });
+
+    console.log(`[Admin] ${shop} registered shop ${targetDomain} (admin=${!!grantAdmin})`);
+
+    res.json({
+      success: true,
+      message: `店铺 ${targetDomain} 已${upserted.accessToken ? '更新' : '注册'}`,
+      shop: {
+        shopDomain: upserted.shopDomain,
+        isAdmin: upserted.isAdmin,
+        hasAccessToken: !!upserted.accessToken,
+      },
+    });
+  } catch (error) {
+    console.error('[Admin Register Shop Error]', error.message);
+    res.status(500).json({ error: 'Failed to register shop', details: error.message });
+  }
+});
+
+/**
+ * @route GET /api/shopify/admin/shops
+ * @desc 管理员查看已注册店铺列表
+ * @access Admin only
+ */
+router.get('/admin/shops', async (req, res) => {
+  const { shop } = req.query;
+
+  if (!shop) {
+    return res.status(400).json({ error: 'Missing shop parameter' });
+  }
+
+  try {
+    const callerShop = await prisma.shop.findUnique({
+      where: { shopDomain: shop.toLowerCase().trim() },
+    });
+
+    const isCallerAdmin = callerShop?.isAdmin || ADMIN_SHOPS.includes(shop.toLowerCase().trim());
+    if (!isCallerAdmin) {
+      return res.status(403).json({ error: 'Forbidden: admin access required' });
+    }
+
+    const shops = await prisma.shop.findMany({
+      select: {
+        id: true,
+        shopDomain: true,
+        name: true,
+        email: true,
+        isActive: true,
+        isAdmin: true,
+        apiKey: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    // 脱敏 apiKey
+    const sanitized = shops.map(s => ({
+      ...s,
+      apiKey: s.apiKey ? s.apiKey.substring(0, 6) + '****' + s.apiKey.substring(s.apiKey.length - 4) : null,
+    }));
+
+    res.json({ shops: sanitized });
+  } catch (error) {
+    console.error('[Admin List Shops Error]', error.message);
+    res.status(500).json({ error: 'Failed to list shops', details: error.message });
   }
 });
 

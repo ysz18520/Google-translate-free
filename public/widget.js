@@ -81,6 +81,10 @@
   }
 
   function getShopDomain() {
+    // 优先使用 Shopify 提供的原生店铺域名（支持自定义域名场景）
+    if (window.Shopify && window.Shopify.shop) {
+      return window.Shopify.shop;
+    }
     return window.location.hostname;
   }
 

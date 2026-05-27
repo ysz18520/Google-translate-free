@@ -475,9 +475,10 @@
     </div>
 
     <!-- 导航 -->
-    <div class="nav">
+    <div class="nav" id="main-nav">
       <button class="nav-btn active" data-tab="dashboard">首页</button>
       <button class="nav-btn" data-tab="settings">设置</button>
+      <button class="nav-btn hidden" id="nav-admin" data-tab="admin">应用管理</button>
     </div>
 
     <!-- 概览页 -->
@@ -604,6 +605,59 @@
         <button class="btn btn-success" id="btn-save-settings">保存设置</button>
       </div>
     </div>
+
+    <!-- 应用管理页（仅管理员可见） -->
+    <div id="tab-admin" class="tab-content hidden">
+      <div class="card">
+        <div class="card-title">注册新店铺</div>
+        <p style="font-size:13px;color:#666;margin-bottom:16px;">
+          为其他店铺配置独立的 Custom App 凭证。配置后，该店铺访问应用时会自动使用对应的 API Key / Secret 发起授权。
+        </p>
+        <div class="form-group">
+          <label class="form-label">目标店铺域名</label>
+          <input type="text" class="form-input" id="admin-target-shop" placeholder="例如：newstore.myshopify.com" style="max-width:100%;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Key（Client ID）</label>
+          <input type="text" class="form-input" id="admin-api-key" placeholder="Custom App 的 API Key" style="max-width:100%;">
+        </div>
+        <div class="form-group">
+          <label class="form-label">API Secret（Client Secret）</label>
+          <input type="text" class="form-input" id="admin-api-secret" placeholder="Custom App 的 Secret" style="max-width:100%;">
+        </div>
+        <div class="form-group">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+            <input type="checkbox" id="admin-grant-admin" style="width:18px;height:18px;">
+            <span>赋予管理权限（该店铺也能注册其他店铺）</span>
+          </label>
+        </div>
+        <button class="btn btn-success" id="btn-admin-register">
+          <span id="admin-register-spinner" class="spinner hidden" style="border-color:#fff;border-top-color:transparent;"></span>
+          <span id="admin-register-text">注册店铺</span>
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-title">已注册店铺列表</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>店铺域名</th>
+                <th>店铺名称</th>
+                <th>API Key</th>
+                <th>管理权限</th>
+                <th>授权状态</th>
+                <th>注册时间</th>
+              </tr>
+            </thead>
+            <tbody id="admin-shop-list">
+              <tr><td colspan="6" style="text-align:center;color:#888;">加载中...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 添加语言弹窗 -->
@@ -688,16 +742,6 @@
       document.body.appendChild(toast);
       setTimeout(() => toast.remove(), 3000);
     }
-
-    // Tab 切换
-    document.querySelectorAll('.nav-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
-        document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
-      });
-    });
 
     // 加载店铺信息，返回授权状态
     async function loadShopInfo() {
@@ -993,6 +1037,122 @@
       }
     });
 
+    // ========== 应用管理（Admin）功能 ==========
+    let currentShopIsAdmin = false;
+
+    function setAdminVisibility(isAdmin) {
+      currentShopIsAdmin = isAdmin;
+      const navAdmin = document.getElementById('nav-admin');
+      if (navAdmin) {
+        navAdmin.classList.toggle('hidden', !isAdmin);
+      }
+    }
+
+    async function loadAdminShopList() {
+      if (!currentShopIsAdmin || !currentShop) return;
+      const tbody = document.getElementById('admin-shop-list');
+      if (!tbody) return;
+
+      try {
+        const res = await fetch(`${API_BASE}/shopify/admin/shops?shop=${encodeURIComponent(currentShop)}`);
+        if (!res.ok) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">加载失败</td></tr>';
+          return;
+        }
+        const data = await res.json();
+        const shops = data.shops || [];
+
+        if (shops.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">暂无注册店铺</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = shops.map(s => `
+          <tr>
+            <td>${s.shopDomain}</td>
+            <td>${s.name || '-'}</td>
+            <td><code style="font-size:12px;background:#f5f5f5;padding:2px 6px;border-radius:4px;">${s.apiKey || '-'}</code></td>
+            <td>${s.isAdmin ? '<span class="badge badge-success">管理员</span>' : '<span class="badge badge-info">普通</span>'}</td>
+            <td>${s.isActive ? '<span class="badge badge-success">已授权</span>' : '<span class="badge badge-warning">未授权</span>'}</td>
+            <td style="font-size:12px;color:#888;">${s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '-'}</td>
+          </tr>
+        `).join('');
+      } catch (e) {
+        console.error('[Admin] Failed to load shop list', e);
+        tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:#888;">加载失败</td></tr>';
+      }
+    }
+
+    document.getElementById('btn-admin-register').addEventListener('click', async () => {
+      const targetShop = document.getElementById('admin-target-shop').value.trim().toLowerCase();
+      const apiKey = document.getElementById('admin-api-key').value.trim();
+      const apiSecret = document.getElementById('admin-api-secret').value.trim();
+      const grantAdmin = document.getElementById('admin-grant-admin').checked;
+
+      if (!targetShop || !apiKey || !apiSecret) {
+        showToast('请填写完整信息', 'error');
+        return;
+      }
+      if (!targetShop.endsWith('.myshopify.com')) {
+        showToast('店铺域名必须以 .myshopify.com 结尾', 'error');
+        return;
+      }
+
+      const btn = document.getElementById('btn-admin-register');
+      const spinner = document.getElementById('admin-register-spinner');
+      const text = document.getElementById('admin-register-text');
+      btn.disabled = true;
+      spinner.classList.remove('hidden');
+      text.textContent = '注册中...';
+
+      try {
+        const res = await fetch(`${API_BASE}/shopify/admin/register-shop`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            shop: currentShop,
+            targetShop,
+            apiKey,
+            apiSecret,
+            grantAdmin,
+          }),
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showToast(data.message || '注册成功');
+          document.getElementById('admin-target-shop').value = '';
+          document.getElementById('admin-api-key').value = '';
+          document.getElementById('admin-api-secret').value = '';
+          document.getElementById('admin-grant-admin').checked = false;
+          await loadAdminShopList();
+        } else {
+          showToast(data.error || '注册失败', 'error');
+        }
+      } catch (e) {
+        showToast('注册失败: ' + e.message, 'error');
+      } finally {
+        btn.disabled = false;
+        spinner.classList.add('hidden');
+        text.textContent = '注册店铺';
+      }
+    });
+
+    // Tab 切换（重新绑定以支持动态 admin tab）
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden'));
+        const target = document.getElementById(`tab-${btn.dataset.tab}`);
+        if (target) target.classList.remove('hidden');
+
+        if (btn.dataset.tab === 'admin') {
+          loadAdminShopList();
+        }
+      });
+    });
+
     // 初始化
     async function init() {
       const shopInfo = await loadShopInfo();
@@ -1008,6 +1168,17 @@
 
       // 授权成功，重置重定向计数
       sessionStorage.removeItem('translator_auth_redirect');
+
+      // 检查管理员权限并显示应用管理 Tab
+      try {
+        const shopRes = await fetch(`${API_BASE}/shopify/shop?shop=${currentShop}`);
+        if (shopRes.ok) {
+          const shopData = await shopRes.json();
+          setAdminVisibility(shopData.isAdmin);
+        }
+      } catch (e) {
+        console.error('[Admin] Failed to check admin status', e);
+      }
 
       await loadSettings();
     }
