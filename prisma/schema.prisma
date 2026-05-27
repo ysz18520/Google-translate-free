@@ -21,40 +21,9 @@ model Shop {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  translations  Translation[]
   settings      ShopSetting?
 
   @@map("shops")
-}
-
-// 翻译内容缓存
-model Translation {
-  id              Int      @id @default(autoincrement())
-  shopId          Int      @map("shop_id")
-  resourceType    String   @map("resource_type") // product, page, blog, collection, theme
-  resourceId      String   @map("resource_id")   // Shopify 资源 ID 或 URL path
-  field           String   // title, description, body_html, 或 page_content
-  sourceText      String   @map("source_text") @db.Text
-  sourceHash      String   @map("source_hash")  // 原文 MD5 哈希，用于检测变化
-  sourceLang      String   @default("en") @map("source_lang")
-  targetLang      String   @map("target_lang")
-  translatedText  String   @map("translated_text") @db.Text
-  status          String   @default("translated") // translated | outdated | pending
-  isAuto          Boolean  @default(true) @map("is_auto")
-
-  // === 翻译引擎追踪（v1.2.0） ===
-  provider      String?  @map("provider")       // baidu / openai-compat / anthropic-compat
-  inputTokens   Int?     @map("input_tokens")   // AI 引擎输入 token
-  outputTokens  Int?     @map("output_tokens")  // AI 引擎输出 token
-
-  createdAt       DateTime @default(now()) @map("created_at")
-  updatedAt       DateTime @updatedAt @map("updated_at")
-
-  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
-
-  @@unique([shopId, resourceType, resourceId, field, targetLang])
-  @@index([shopId, targetLang, status])
-  @@map("translations")
 }
 
 // 店铺设置
@@ -89,16 +58,3 @@ model ShopSetting {
   @@map("shop_settings")
 }
 
-// Webhook 事件日志
-model WebhookLog {
-  id          Int      @id @default(autoincrement())
-  shopId      Int      @map("shop_id")
-  topic       String   // products/update, pages/update, themes/update
-  resourceId  String?  @map("resource_id")
-  payload     String?  @db.Text
-  processed   Boolean  @default(false)
-  createdAt   DateTime @default(now()) @map("created_at")
-
-  @@index([shopId, topic])
-  @@map("webhook_logs")
-}

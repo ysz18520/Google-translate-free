@@ -166,45 +166,10 @@ router.get('/callback', async (req, res) => {
 
 /**
  * @route POST /api/shopify/webhook
- * @desc 接收 Shopify Webhook 推送（v6.0+ 仅记录日志，不再处理翻译相关逻辑）
+ * @desc 接收 Shopify Webhook 推送（v2.0+ 直接返回 OK，不再记录日志）
  */
-router.post('/webhook', async (req, res) => {
+router.post('/webhook', (req, res) => {
   res.status(200).send('OK');
-
-  const topic = req.headers['x-shopify-topic'];
-  const shopDomain = req.headers['x-shopify-shop-domain'];
-
-  if (!topic || !shopDomain) {
-    console.warn('[Webhook] Missing topic or shop domain');
-    return;
-  }
-
-  console.log(`[Webhook] Received ${topic} from ${shopDomain}`);
-
-  try {
-    const shop = await prisma.shop.findUnique({
-      where: { shopDomain },
-    });
-
-    if (!shop) {
-      console.warn(`[Webhook] Shop not found: ${shopDomain}`);
-      return;
-    }
-
-    await prisma.webhookLog.create({
-      data: {
-        shopId: shop.id,
-        topic,
-        resourceId: req.body.id?.toString(),
-        payload: JSON.stringify(req.body).slice(0, 5000),
-      },
-    });
-
-    // v6.0+：不再处理翻译缓存的更新/删除逻辑
-    // Google Translate 在前端实时翻译，后端无需维护翻译状态
-  } catch (error) {
-    console.error('[Webhook Processing Error]', error.message);
-  }
 });
 
 /**

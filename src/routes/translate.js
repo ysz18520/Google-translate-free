@@ -9,7 +9,7 @@ const router = express.Router();
  * @desc 保存翻译引擎配置
  */
 router.post('/config', async (req, res) => {
-  const { shop, provider, apiKey, apiSecret, model, endpoint, confirmReTranslate } = req.body;
+  const { shop, provider, apiKey, apiSecret, model, endpoint } = req.body;
 
   if (!shop) {
     return res.status(400).json({ error: 'Missing shop parameter' });
@@ -24,35 +24,10 @@ router.post('/config', async (req, res) => {
       return res.status(401).json({ error: 'Shop not authorized' });
     }
 
-    const currentSetting = await prisma.shopSetting.findUnique({
-      where: { shopId: shopRecord.id },
-    });
-
-    const currentProvider = currentSetting?.translateProvider || 'baidu';
-    const AI_PROVIDERS = ['openai-compat', 'anthropic-compat'];
-    const isSwitchingToAi = AI_PROVIDERS.includes(provider) && !AI_PROVIDERS.includes(currentProvider);
-
-    if (isSwitchingToAi && !confirmReTranslate) {
-      const count = await prisma.translation.count({
-        where: {
-          shopId: shopRecord.id,
-          status: 'translated',
-        },
-      });
-
-      return res.json({
-        requireConfirm: true,
-        message: '切换到 AI 翻译将使用您自己的 API Key 进行全量重翻，可能产生费用',
-        translatedCount: count,
-        currentProvider,
-        newProvider: provider,
-      });
-    }
-
     const updateData = {
-      translateProvider: provider || 'baidu',
-      translateModel: AI_PROVIDERS.includes(provider) ? (model || null) : null,
-      translateEndpoint: AI_PROVIDERS.includes(provider) ? (endpoint || null) : null,
+      translateProvider: provider || null,
+      translateModel: model || null,
+      translateEndpoint: endpoint || null,
     };
 
     if (apiKey) updateData.translateApiKey = encrypt(apiKey);
@@ -67,23 +42,10 @@ router.post('/config', async (req, res) => {
       },
     });
 
-    if (confirmReTranslate && isSwitchingToAi) {
-      await prisma.translation.updateMany({
-        where: {
-          shopId: shopRecord.id,
-          status: 'translated',
-        },
-        data: { status: 'outdated' },
-      });
-    }
-
     res.json({
       success: true,
-      message: isSwitchingToAi && confirmReTranslate
-        ? '配置已保存，所有翻译已标记为待更新，将自动重新翻译'
-        : '配置已保存',
+      message: '配置已保存',
       provider: updateData.translateProvider,
-      reTranslateTriggered: !!(confirmReTranslate && isSwitchingToAi),
     });
   } catch (error) {
     console.error('[Translate Config Error]', error.message);
