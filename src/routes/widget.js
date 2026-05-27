@@ -6,11 +6,11 @@ const prisma = require('../utils/db');
 const router = express.Router();
 
 const BUILTIN_LANGUAGES = [
-  { code: 'en', name: 'English', flag: '🇺🇸', baiduCode: 'en' },
-  { code: 'es', name: 'Español', flag: '🇪🇸', baiduCode: 'spa' },
-  { code: 'fr', name: 'Français', flag: '🇫🇷', baiduCode: 'fra' },
-  { code: 'ara', name: 'العربية', flag: '🇸🇦', baiduCode: 'ara' },
-  { code: 'zh', name: '中文', flag: '🇨🇳', baiduCode: 'zh' },
+  { code: 'en', name: 'English', flag: '🇺🇸' },
+  { code: 'es', name: 'Español', flag: '🇪🇸' },
+  { code: 'fr', name: 'Français', flag: '🇫🇷' },
+  { code: 'ara', name: 'العربية', flag: '🇸🇦' },
+  { code: 'zh', name: '中文', flag: '🇨🇳' },
 ];
 
 const MANDATORY_LANG_CODES = ['en', 'es', 'fr', 'ara', 'zh'];
@@ -38,7 +38,6 @@ function buildLanguageList(setting) {
               code: c.code,
               name: c.name || c.code,
               flag: c.flag || '🏳️',
-              baiduCode: c.baiduCode || c.code,
             });
           }
         }
@@ -73,7 +72,6 @@ router.get('/config', async (req, res) => {
     color: '#1976d2',
     languages: BUILTIN_LANGUAGES.map(l => ({ code: l.code, name: l.name, flag: l.flag })),
     enabledLanguages: 'en,es,fr,ara,zh',
-    // 注意：v6.0+ 起网站原文语言由前端自动检测 <html lang>，不再通过此接口配置
   };
 
   if (shop) {
@@ -88,7 +86,6 @@ router.get('/config', async (req, res) => {
         if (setting.widgetPosition) defaultConfig.position = setting.widgetPosition;
         if (setting.widgetColor) defaultConfig.color = setting.widgetColor;
 
-        // 构建语言列表（内置 + 自定义）
         const languages = buildLanguageList(setting);
         defaultConfig.languages = languages.map(l => ({ code: l.code, name: l.name, flag: l.flag }));
 
@@ -122,7 +119,6 @@ router.post('/config', async (req, res) => {
       return res.status(404).json({ error: 'Shop not found' });
     }
 
-    // 确保 enabledLanguages 包含所有必备语言
     let finalEnabledLanguages = enabledLanguages || 'en,es,fr,ara,zh';
     const enabledCodes = finalEnabledLanguages.split(',').map(s => s.trim()).filter(Boolean);
     for (const code of MANDATORY_LANG_CODES) {
@@ -135,7 +131,6 @@ router.post('/config', async (req, res) => {
     if (color) updateData.widgetColor = color;
     if (enabledLanguages) {
       updateData.enabledLanguages = finalEnabledLanguages;
-      // 同步旧字段保持兼容
       updateData.activeLanguages = finalEnabledLanguages;
     }
     if (customLanguages !== undefined) updateData.customLanguages = customLanguages;
@@ -161,67 +156,6 @@ router.post('/config', async (req, res) => {
 });
 
 /**
- * @route GET /api/widget/translations
- * @desc 获取店铺已翻译内容（前端动态替换用）
- */
-router.get('/translations', async (req, res) => {
-  const { shop, locale = 'en', resourceType, resourceId } = req.query;
-
-  if (!shop) {
-    return res.status(400).json({ error: 'Missing shop parameter' });
-  }
-
-  try {
-    const shopRecord = await prisma.shop.findUnique({
-      where: { shopDomain: shop },
-    });
-
-    if (!shopRecord) {
-      return res.status(404).json({ error: 'Shop not found' });
-    }
-
-    const whereClause = {
-      shopId: shopRecord.id,
-      targetLang: locale,
-    };
-
-    if (resourceType) whereClause.resourceType = resourceType;
-    if (resourceId) whereClause.resourceId = resourceId;
-
-    const translations = await prisma.translation.findMany({
-      where: whereClause,
-      select: {
-        resourceType: true,
-        resourceId: true,
-        field: true,
-        sourceText: true,
-        translatedText: true,
-        status: true,
-      },
-    });
-
-    // 构建翻译映射表
-    const strings = {};
-    for (const t of translations) {
-      if (t.status === 'translated') {
-        strings[t.sourceText] = t.translatedText;
-      }
-    }
-
-    res.json({
-      locale,
-      shop,
-      strings,
-      count: translations.length,
-      lastUpdated: new Date().toISOString(),
-    });
-  } catch (error) {
-    console.error('[Get Translations Error]', error.message);
-    res.status(500).json({ error: 'Failed to fetch translations' });
-  }
-});
-
-/**
  * @route POST /api/widget/debug-auth
  * @desc 生成店主调试授权 token
  */
@@ -241,7 +175,6 @@ router.post('/debug-auth', async (req, res) => {
       return res.status(404).json({ error: 'Shop not found' });
     }
 
-    // 生成随机 token
     const token = crypto.randomBytes(32).toString('hex');
 
     await prisma.shopSetting.upsert({
@@ -253,7 +186,6 @@ router.post('/debug-auth', async (req, res) => {
       },
     });
 
-    // 生成带 token 的店铺链接
     const shopUrl = `https://${shop}`;
     const debugUrl = `${shopUrl}?translator_debug=${token}`;
 
@@ -300,84 +232,6 @@ router.get('/verify-debug', async (req, res) => {
   } catch (error) {
     console.error('[Verify Debug Error]', error.message);
     res.status(500).json({ error: 'Verification failed' });
-  }
-});
-
-/**
- * @route POST /api/widget/cache
- * @desc 前端实时翻译结果回写数据库（缓存持久化）
- */
-router.post('/cache', async (req, res) => {
-  const { shop, locale, translations } = req.body;
-
-  if (!shop || !locale || !translations || typeof translations !== 'object') {
-    return res.status(400).json({ error: 'Missing shop, locale, or translations' });
-  }
-
-  try {
-    const shopRecord = await prisma.shop.findUnique({
-      where: { shopDomain: shop },
-    });
-
-    if (!shopRecord) {
-      return res.status(404).json({ error: 'Shop not found' });
-    }
-
-    const entries = Object.entries(translations);
-    let saved = 0;
-    let skipped = 0;
-
-    for (const [sourceText, translatedText] of entries) {
-      if (!sourceText || !translatedText || sourceText === translatedText) {
-        skipped++;
-        continue;
-      }
-
-      const hash = crypto.createHash('md5').update(sourceText).digest('hex');
-
-      try {
-        await prisma.translation.upsert({
-          where: {
-            shopId_resourceType_resourceId_field_targetLang: {
-              shopId: shopRecord.id,
-              resourceType: 'theme_dynamic',
-              resourceId: 'cache',
-              field: sourceText.substring(0, 100),
-              targetLang: locale,
-            },
-          },
-          update: {
-            sourceText,
-            sourceHash: hash,
-            translatedText,
-            status: 'translated',
-            updatedAt: new Date(),
-          },
-          create: {
-            shopId: shopRecord.id,
-            resourceType: 'theme_dynamic',
-            resourceId: 'cache',
-            field: sourceText.substring(0, 100),
-            sourceText,
-            sourceHash: hash,
-            sourceLang: 'en',
-            targetLang: locale,
-            translatedText,
-            status: 'translated',
-            provider: 'anthropic-compat',
-          },
-        });
-        saved++;
-      } catch (dbErr) {
-        console.warn('[Widget Cache] Upsert failed:', dbErr.message);
-        skipped++;
-      }
-    }
-
-    res.json({ success: true, saved, skipped, total: entries.length });
-  } catch (error) {
-    console.error('[Widget Cache Error]', error.message);
-    res.status(500).json({ error: 'Failed to save cache' });
   }
 });
 

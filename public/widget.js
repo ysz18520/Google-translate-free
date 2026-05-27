@@ -2,8 +2,8 @@
   'use strict';
 
   // ==========================================================
-  // Shopify 多语言翻译插件 - 前端悬浮切换器 v5.2
-  // 核心架构：WeakMap 原文记录 + 文本节点替换 + API 预加载
+  // Shopify 多语言翻译插件 - 前端悬浮切换器 v6.0
+  // 核心架构：Google Translate 免费组件 + 自定义 UI 套壳
   // ==========================================================
 
   const WIDGET_ID = 'coollaa-translator-widget';
@@ -25,6 +25,18 @@
   let config = { ...defaultConfig };
   let currentLang;
   let isOpen = false;
+  let googleLoaded = false;
+
+  // 语言代码映射：内部 code -> Google Translate code
+  const GOOGLE_LANG_MAP = {
+    'en': 'en',
+    'es': 'es',
+    'fr': 'fr',
+    'ara': 'ar',
+    'zh': 'zh-CN',
+  };
+
+  const rtlLangs = ['ara'];
 
   // ==========================================================
   // 网站原文语言自动检测
@@ -33,9 +45,7 @@
   function normalizeLangCode(rawLang) {
     if (!rawLang) return 'en';
     const lower = rawLang.toLowerCase().trim();
-    // 取主语言代码（如 en-US → en）
     const primary = lower.split('-')[0];
-    // 映射到插件支持的语言代码
     const map = {
       'en': 'en', 'eng': 'en',
       'es': 'es', 'spa': 'es',
@@ -47,25 +57,13 @@
   }
 
   function detectSourceLanguage() {
-    // 读取网站 <html lang> 属性，如 <html lang="en"> 或 <html lang="en-US">
     const htmlLang = document.documentElement.lang || document.documentElement.getAttribute('xml:lang');
     const detected = normalizeLangCode(htmlLang);
     console.log(`[Translator] Detected source language: ${detected} (from <html lang="${htmlLang || ''}">)`);
     return detected;
   }
 
-  // 源语言：从网站 <html lang> 自动检测，不再硬编码
   const sourceLanguage = detectSourceLanguage();
-
-  // 核心状态：按语言缓存的翻译字典 + 原始文本 WeakMap
-  let pageTranslations = {}; // { es: { "Welcome": "Bienvenido" }, zh: {...} }
-  const originalTexts = new WeakMap(); // node -> original textContent
-  let hasRecordedOriginalTexts = false;
-
-  let observer = null;
-  let isRebuilding = false;
-
-  const rtlLangs = ['ara'];
 
   // ==========================================================
   // 工具函数
@@ -86,10 +84,6 @@
     return window.location.hostname;
   }
 
-  function normalizeText(text) {
-    return text.replace(/ /g, ' ').replace(/\s+/g, ' ').trim();
-  }
-
   // ==========================================================
   // API 请求
   // ==========================================================
@@ -104,29 +98,6 @@
     } catch (e) {
       console.warn('[Translator] Failed to load config');
     }
-  }
-
-  async function fetchTranslations(locale) {
-    // 如果内存中已有该语言的翻译，直接返回
-    if (pageTranslations[locale]) {
-      return pageTranslations[locale];
-    }
-
-    try {
-      const res = await fetch(
-        `${API_BASE}/widget/translations?shop=${getShopDomain()}&locale=${locale}`
-      );
-      if (res.ok) {
-        const data = await res.json();
-        // 兼容后端两种返回格式：translations 或 strings
-        const dict = data.translations || data.strings || {};
-        pageTranslations[locale] = dict;
-        return dict;
-      }
-    } catch (e) {
-      console.warn('[Translator] Failed to load translations');
-    }
-    return {};
   }
 
   // ==========================================================
@@ -169,7 +140,6 @@
         isManual = parsed.source === 'manual';
       }
     } catch (e) {
-      // 兼容旧格式：纯字符串，视为非手动
       savedLang = savedRaw;
     }
 
@@ -177,7 +147,6 @@
       return savedLang;
     }
 
-    // 旧格式或已移除的语言，清理并回退到网站原文语言
     if (savedLang) {
       localStorage.removeItem('coollaa_lang');
     }
@@ -186,354 +155,87 @@
   }
 
   // ==========================================================
-  // 原始文本记录（v5：不再 innerHTML 重建，只记录/恢复文本节点）
+  // Google Translate 集成
   // ==========================================================
 
-  function getAllBodyTextNodes() {
-    const walker = document.createTreeWalker(
-      document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: function (node) {
-          const parent = node.parentElement;
-          if (!parent || shouldIgnoreElement(parent)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
+  function loadGoogleTranslateScript() {
+    return new Promise((resolve, reject) => {
+      if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+        resolve();
+        return;
       }
-    );
-    const nodes = [];
-    let node;
-    while ((node = walker.nextNode())) {
-      nodes.push(node);
-    }
-    return nodes;
-  }
 
-  function recordOriginalTexts() {
-    if (hasRecordedOriginalTexts) return;
-    hasRecordedOriginalTexts = true;
-
-    const nodes = getAllBodyTextNodes();
-    for (const node of nodes) {
-      // 切换语言后必须重新记录原文，不能跳过已有节点（否则上次翻译的内容会被当成原文）
-      originalTexts.set(node, node.textContent);
-    }
-    // 记录 placeholder 原始值
-    document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(el => {
-      el.dataset.originalPlaceholder = el.getAttribute('placeholder') || '';
-    });
-    console.log(`[Translator] Recorded ${nodes.length} text nodes`);
-  }
-
-  function restoreOriginalTexts() {
-    const nodes = getAllBodyTextNodes();
-    let count = 0;
-    for (const node of nodes) {
-      const original = originalTexts.get(node);
-      if (original !== undefined && node.textContent !== original) {
-        node.textContent = original;
-        count++;
-      }
-    }
-    // 恢复 placeholder
-    document.querySelectorAll('input[placeholder], textarea[placeholder]').forEach(el => {
-      const originalPh = el.dataset.originalPlaceholder;
-      if (originalPh !== undefined && el.getAttribute('placeholder') !== originalPh) {
-        el.setAttribute('placeholder', originalPh);
-      }
-    });
-    console.log(`[Translator] Restored ${count} text nodes`);
-  }
-
-  // ==========================================================
-  // 文本节点收集（用于翻译应用）
-  // ==========================================================
-
-  function shouldIgnoreElement(el) {
-    if (!el || !el.tagName) return true;
-    const tag = el.tagName.toLowerCase();
-    if (['script', 'style', 'noscript', 'iframe', 'code', 'pre', 'svg', 'path', 'text', 'tspan', 'title', 'desc', 'defs', 'clipPath', 'mask', 'filter', 'linearGradient', 'radialGradient', 'stop'].includes(tag)) {
-      return true;
-    }
-    if (el.closest && el.closest(`#${WIDGET_ID}`)) return true;
-    return false;
-  }
-
-  function getTextNodes(root) {
-    const walker = document.createTreeWalker(
-      root || document.body,
-      NodeFilter.SHOW_TEXT,
-      {
-        acceptNode: function (node) {
-          const parent = node.parentElement;
-          if (!parent || shouldIgnoreElement(parent)) {
-            return NodeFilter.FILTER_REJECT;
+      // 避免重复加载
+      if (document.querySelector('script[src*="translate.google.com/translate_a/element.js"]')) {
+        // 等待加载完成
+        const check = setInterval(() => {
+          if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+            clearInterval(check);
+            resolve();
           }
-          const text = node.textContent.trim();
-          if (!text || text.length < 2) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          if (/^[\d\s\W]+$/.test(text)) {
-            return NodeFilter.FILTER_REJECT;
-          }
-          return NodeFilter.FILTER_ACCEPT;
-        }
+        }, 100);
+        setTimeout(() => {
+          clearInterval(check);
+          reject(new Error('Google Translate script timeout'));
+        }, 10000);
+        return;
       }
-    );
 
-    const nodes = [];
-    let node;
-    while ((node = walker.nextNode())) {
-      nodes.push(node);
-    }
-    return nodes;
-  }
+      window.googleTranslateElementInit = function () {
+        const container = document.getElementById('google_translate_element');
+        if (!container) return;
 
-  function getTranslatableAttributes() {
-    return Array.from(document.querySelectorAll('input[placeholder], textarea[placeholder]')).filter(el => {
-      if (shouldIgnoreElement(el)) return false;
-      const ph = el.getAttribute('placeholder');
-      return ph && ph.trim().length >= 2;
+        new google.translate.TranslateElement({
+          pageLanguage: sourceLanguage === 'zh' ? 'zh-CN' : sourceLanguage,
+          includedLanguages: config.languages.map(l => GOOGLE_LANG_MAP[l.code] || l.code).join(','),
+          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+        }, 'google_translate_element');
+
+        googleLoaded = true;
+        resolve();
+      };
+
+      const script = document.createElement('script');
+      script.src = `https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit`;
+      script.async = true;
+      script.onerror = () => reject(new Error('Failed to load Google Translate script'));
+      document.head.appendChild(script);
     });
   }
 
-  // ==========================================================
-  // 翻译应用（一次性替换，不记录原文）
-  // ==========================================================
-
-  function applyTranslations(dict, targetLang) {
-    if (currentLang !== targetLang) {
-      console.log('[Translator] applyTranslations: lang mismatch', currentLang, targetLang);
-      return [];
+  function triggerGoogleTranslate(langCode) {
+    if (!googleLoaded) {
+      console.warn('[Translator] Google Translate not loaded yet');
+      return false;
     }
 
-    // 预处理字典：将 &nbsp;( ) 统一替换为普通空格，确保与后端提取的文本匹配
-    const normalizedDict = {};
-    for (const key in dict) {
-      normalizedDict[normalizeText(key)] = dict[key];
+    const googleCode = GOOGLE_LANG_MAP[langCode] || langCode;
+
+    // 找到 Google 的下拉选择框
+    const combo = document.querySelector('.goog-te-combo');
+    if (!combo) {
+      console.warn('[Translator] Google Translate combo not found');
+      return false;
     }
 
-    const missingTexts = new Set();
-
-    const textNodes = getTextNodes();
-    console.log(`[Translator] applyTranslations: ${textNodes.length} text nodes, dict has ${Object.keys(normalizedDict).length} keys`);
-    for (const node of textNodes) {
-      const fullText = node.textContent;
-      const text = normalizeText(fullText);
-      if (normalizedDict[text]) {
-        // 保留原始的前导和尾随空白
-        const leading = fullText.match(/^\s*/)[0];
-        const trailing = fullText.match(/\s*$/)[0];
-        node.textContent = leading + normalizedDict[text] + trailing;
-      } else {
-        missingTexts.add(text);
-      }
+    if (combo.value === googleCode) {
+      return true; // 已经是目标语言
     }
 
-    const attrElements = getTranslatableAttributes();
-    for (const el of attrElements) {
-      const ph = el.getAttribute('placeholder');
-      if (ph) {
-        const normalizedPh = normalizeText(ph);
-        if (normalizedDict[normalizedPh]) {
-          el.setAttribute('placeholder', normalizedDict[normalizedPh]);
-        } else {
-          missingTexts.add(normalizedPh);
-        }
-      }
-    }
-
-    return Array.from(missingTexts);
+    combo.value = googleCode;
+    combo.dispatchEvent(new Event('change'));
+    return true;
   }
 
-  /**
-   * 实时翻译兜底：批量发送未命中缓存的文本到后端翻译
-   */
-  async function fetchRealtimeTranslations(texts, targetLang) {
-    const uniqueTexts = [...new Set(texts)].filter(t => t.length >= 2 && !/^\d+$/.test(t));
-    if (uniqueTexts.length === 0) return {};
+  function restoreOriginalLanguage() {
+    // 恢复到原文：将 Google 下拉框设为空或源语言
+    const combo = document.querySelector('.goog-te-combo');
+    if (!combo) return false;
 
-    // 分批处理，每批最多 20 个（避免请求过大）
-    const batchSize = 20;
-    const results = {};
-
-    for (let i = 0; i < uniqueTexts.length; i += batchSize) {
-      const batch = uniqueTexts.slice(i, i + batchSize);
-      const items = batch.map(text => ({ text, from: sourceLanguage, to: targetLang }));
-
-      try {
-        const res = await fetch(`${API_BASE}/translate/batch`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ items, from: sourceLanguage, to: targetLang, shop: getShopDomain() }),
-        });
-
-        if (res.ok) {
-          const data = await res.json();
-          if (data.results) {
-            for (const r of data.results) {
-              results[r.source] = r.translated;
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('[Translator] Realtime batch translation failed:', e);
-      }
-    }
-
-    return results;
-  }
-
-  /**
-   * 将实时翻译结果回写到后端缓存（fire-and-forget，不阻塞）
-   */
-  function saveTranslationsToCache(translations, targetLang) {
-    if (!translations || Object.keys(translations).length === 0) return;
-    fetch(`${API_BASE}/widget/cache`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        shop: getShopDomain(),
-        locale: targetLang,
-        translations,
-      }),
-    }).catch(e => {
-      // 静默失败，不影响用户体验
-      console.warn('[Translator] Cache save failed:', e);
-    });
-  }
-
-  // ==========================================================
-  // 快照重建核心逻辑
-  // ==========================================================
-
-  async function rebuildAndTranslate(targetLang) {
-    if (isRebuilding) return;
-    isRebuilding = true;
-
-    try {
-      // 1. 停止 Observer
-      stopObserver();
-
-      // 2. 恢复所有文本节点到原始状态（v5：不再 innerHTML 重建）
-      restoreOriginalTexts();
-
-      // 3. 设置页面方向（RTL/LTR）
-      setPageDirection(targetLang);
-
-      // 4. 如果目标语言不是源语言，应用翻译（含实时兜底）
-      if (targetLang !== sourceLanguage) {
-        const dict = await fetchTranslations(targetLang);
-        if (currentLang === targetLang) {
-          const missing = applyTranslations(dict, targetLang);
-
-          // 实时翻译兜底：未命中缓存的文本自动发送到后端翻译
-          if (missing.length > 0) {
-            console.log(`[Translator] ${missing.length} texts missing, fetching realtime translations...`);
-            const realtimeDict = await fetchRealtimeTranslations(missing, targetLang);
-            if (Object.keys(realtimeDict).length > 0 && currentLang === targetLang) {
-              // 合并到缓存字典
-              Object.assign(pageTranslations[targetLang], realtimeDict);
-              // 再次应用翻译
-              applyTranslations(pageTranslations[targetLang], targetLang);
-              console.log(`[Translator] Realtime translation applied: ${Object.keys(realtimeDict).length} texts`);
-              // 回写缓存，下次访问直接命中
-              saveTranslationsToCache(realtimeDict, targetLang);
-            }
-          }
-        }
-        // 启动 Observer 捕获动态加载内容
-        startObserver();
-      }
-    } catch (err) {
-      console.error('[Translator] rebuildAndTranslate error:', err);
-    } finally {
-      isRebuilding = false;
-    }
-  }
-
-  function setPageDirection(lang) {
-    if (rtlLangs.includes(lang)) {
-      document.documentElement.setAttribute('dir', 'rtl');
-      document.body.style.direction = 'rtl';
-    } else {
-      document.documentElement.removeAttribute('dir');
-      document.body.style.direction = '';
-    }
-  }
-
-  // ==========================================================
-  // DOM 观察器（仅用于捕获动态加载的内容）
-  // ==========================================================
-
-  function startObserver() {
-    if (observer) return;
-    if (currentLang === sourceLanguage) return;
-
-    observer = new MutationObserver((mutations) => {
-      let hasNewNodes = false;
-      mutations.forEach(mutation => {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === Node.ELEMENT_NODE && !shouldIgnoreElement(node)) {
-            // 记录新节点内的所有文本节点原始文本
-            const walker = document.createTreeWalker(
-              node,
-              NodeFilter.SHOW_TEXT,
-              {
-                acceptNode: function (n) {
-                  const parent = n.parentElement;
-                  if (!parent || shouldIgnoreElement(parent)) {
-                    return NodeFilter.FILTER_REJECT;
-                  }
-                  return NodeFilter.FILTER_ACCEPT;
-                }
-              }
-            );
-            let textNode;
-            while ((textNode = walker.nextNode())) {
-              if (!originalTexts.has(textNode)) {
-                originalTexts.set(textNode, textNode.textContent);
-              }
-            }
-            hasNewNodes = true;
-          }
-        });
-      });
-
-      if (hasNewNodes) {
-        clearTimeout(window._translatorDebounce);
-        window._translatorDebounce = setTimeout(async () => {
-          if (currentLang !== sourceLanguage && pageTranslations[currentLang]) {
-            const missing = applyTranslations(pageTranslations[currentLang], currentLang);
-
-            // 动态加载内容可能有新文本，实时翻译兜底
-            if (missing.length > 0) {
-              const realtimeDict = await fetchRealtimeTranslations(missing, currentLang);
-              if (Object.keys(realtimeDict).length > 0) {
-                Object.assign(pageTranslations[currentLang], realtimeDict);
-                applyTranslations(pageTranslations[currentLang], currentLang);
-                // 回写缓存，下次访问直接命中
-                saveTranslationsToCache(realtimeDict, currentLang);
-              }
-            }
-          }
-        }, 150);
-      }
-    });
-
-    observer.observe(document.body, {
-      childList: true,
-      subtree: true,
-    });
-  }
-
-  function stopObserver() {
-    if (observer) {
-      observer.disconnect();
-      observer = null;
-    }
+    // 空值表示"原文"（Original）
+    combo.value = '';
+    combo.dispatchEvent(new Event('change'));
+    return true;
   }
 
   // ==========================================================
@@ -545,6 +247,20 @@
     if ($(`#${styleId}`)) return;
 
     const css = `
+      /* 隐藏 Google Translate 默认 UI */
+      .goog-te-banner-frame,
+      .goog-te-gadget,
+      .skiptranslate,
+      #goog-gt-tt,
+      .goog-te-menu-value,
+      .goog-te-balloon-frame,
+      #goog-gt-\.tt {
+        display: none !important;
+      }
+      body {
+        top: 0 !important;
+      }
+
       #${WIDGET_ID} {
         position: fixed;
         z-index: 2147483647;
@@ -806,8 +522,6 @@
     dropdown.classList.toggle('open', isOpen);
   }
 
-  let pendingLang = null;
-
   function updateWidgetActiveLang(langCode) {
     document.querySelectorAll(`.${WIDGET_ID}-item`).forEach(item => {
       item.classList.toggle('active', item.dataset.lang === langCode);
@@ -819,39 +533,14 @@
     }
   }
 
-  function switchLanguage(langCode) {
-    if (langCode === currentLang) {
-      toggleDropdown();
-      return;
+  function setPageDirection(lang) {
+    if (rtlLangs.includes(lang)) {
+      document.documentElement.setAttribute('dir', 'rtl');
+      document.body.style.direction = 'rtl';
+    } else {
+      document.documentElement.removeAttribute('dir');
+      document.body.style.direction = '';
     }
-
-    // 如果正在重建，排队等待当前完成后再切换
-    if (isRebuilding) {
-      pendingLang = langCode;
-      toggleDropdown();
-      return;
-    }
-
-    toggleDropdown();
-    showLoading();
-
-    currentLang = langCode;
-    localStorage.setItem('coollaa_lang', JSON.stringify({ code: langCode, source: 'manual' }));
-    updateWidgetActiveLang(langCode);
-
-    rebuildAndTranslate(langCode).then(() => {
-      hideLoading();
-      // 处理排队请求
-      if (pendingLang && pendingLang !== currentLang) {
-        const next = pendingLang;
-        pendingLang = null;
-        switchLanguage(next);
-      }
-    }).catch(err => {
-      console.error('[Translator] Rebuild failed:', err);
-      hideLoading();
-      pendingLang = null;
-    });
   }
 
   function showLoading() {
@@ -864,6 +553,41 @@
     if (btn) btn.classList.remove('translating');
   }
 
+  async function switchLanguage(langCode) {
+    if (langCode === currentLang) {
+      toggleDropdown();
+      return;
+    }
+
+    toggleDropdown();
+    showLoading();
+
+    currentLang = langCode;
+    localStorage.setItem('coollaa_lang', JSON.stringify({ code: langCode, source: 'manual' }));
+    updateWidgetActiveLang(langCode);
+
+    // 触发 Google Translate
+    if (langCode === sourceLanguage) {
+      restoreOriginalLanguage();
+      setPageDirection(sourceLanguage);
+    } else {
+      const ok = triggerGoogleTranslate(langCode);
+      if (!ok) {
+        console.warn('[Translator] Google Translate trigger failed, will retry...');
+        // 如果还没加载完，等一会儿再试
+        setTimeout(() => {
+          triggerGoogleTranslate(langCode);
+        }, 2000);
+      }
+      setPageDirection(langCode);
+    }
+
+    // Google Translate 翻译是异步的，短暂显示 loading 后隐藏
+    setTimeout(() => {
+      hideLoading();
+    }, 800);
+  }
+
   // ==========================================================
   // 初始化
   // ==========================================================
@@ -874,50 +598,38 @@
       return;
     }
 
-    console.log('[Coollaa Translator] Initializing... v5.3 (auto-source-lang)');
+    console.log('[Coollaa Translator] Initializing... v6.0 (Google Translate)');
 
     await fetchConfig();
+
+    // 创建隐藏容器供 Google Translate 初始化
+    const hiddenContainer = createEl('div', '');
+    hiddenContainer.id = 'google_translate_element';
+    hiddenContainer.style.display = 'none';
+    document.body.appendChild(hiddenContainer);
 
     // 先创建 UI
     createStyles();
     createWidget();
 
-    // 确定初始语言（尊重已保存偏好，否则使用默认语言）
+    // 确定初始语言
     currentLang = detectInitialLanguage();
-
-    // 更新 widget 的 active 状态
     updateWidgetActiveLang(currentLang);
 
-    // 核心：记录所有文本节点的原始文本（v5：不再保存 innerHTML 快照）
-    recordOriginalTexts();
+    // 加载 Google Translate 脚本
+    try {
+      await loadGoogleTranslateScript();
+      console.log('[Coollaa Translator] Google Translate loaded');
 
-    // 如果当前不是源语言，获取翻译并应用（含实时兜底）
-    if (currentLang !== sourceLanguage) {
-      setPageDirection(currentLang);
-      const dict = await fetchTranslations(currentLang);
-      console.log(`[Translator] Loaded dict with ${Object.keys(dict).length} keys for ${currentLang}`);
-
-      const missing = applyTranslations(dict, currentLang);
-      console.log(`[Translator] After applyTranslations, missing=${missing.length}`);
-      if (missing.length > 0) {
-        console.log(`[Translator] Missing texts sample:`, missing.slice(0, 5));
+      // 如果初始语言不是源语言，触发翻译
+      if (currentLang !== sourceLanguage) {
+        setPageDirection(currentLang);
+        setTimeout(() => {
+          triggerGoogleTranslate(currentLang);
+        }, 300);
       }
-
-      // 实时翻译兜底
-      if (missing.length > 0) {
-        console.log(`[Translator] ${missing.length} texts missing, fetching realtime translations...`);
-        const realtimeDict = await fetchRealtimeTranslations(missing, currentLang);
-        console.log(`[Translator] Realtime result: ${Object.keys(realtimeDict).length} texts`);
-        if (Object.keys(realtimeDict).length > 0) {
-          Object.assign(pageTranslations[currentLang], realtimeDict);
-          applyTranslations(pageTranslations[currentLang], currentLang);
-          console.log(`[Translator] Realtime translation applied: ${Object.keys(realtimeDict).length} texts`);
-          // 回写缓存，下次访问直接命中
-          saveTranslationsToCache(realtimeDict, currentLang);
-        }
-      }
-
-      startObserver();
+    } catch (err) {
+      console.error('[Coollaa Translator] Failed to load Google Translate:', err.message);
     }
 
     console.log(`[Coollaa Translator] Ready. Current language: ${currentLang}`);
@@ -925,18 +637,14 @@
 
   init();
 
-  // bfcache 恢复后重新应用当前语言的翻译（避免浏览器缓存导致状态不一致）
+  // bfcache 恢复后重新应用当前语言
   window.addEventListener('pageshow', (event) => {
-    if (event.persisted && currentLang !== sourceLanguage) {
-      console.log('[Translator] Page restored from bfcache, reapplying translations');
-      if (pageTranslations[currentLang]) {
-        applyTranslations(pageTranslations[currentLang], currentLang);
-      } else {
-        // 如果缓存中没有该语言的翻译，重新获取
-        fetchTranslations(currentLang).then(dict => {
-          applyTranslations(dict, currentLang);
-        });
-      }
+    if (event.persisted && currentLang && currentLang !== sourceLanguage) {
+      console.log('[Translator] Page restored from bfcache, reapplying language');
+      setTimeout(() => {
+        triggerGoogleTranslate(currentLang);
+        setPageDirection(currentLang);
+      }, 300);
     }
   });
 })();

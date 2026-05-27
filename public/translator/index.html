@@ -505,63 +505,6 @@
       </div>
 
       <div class="card">
-        <div class="card-title">全站翻译</div>
-        <p style="color:#666; font-size:13px; margin-bottom:12px;">
-          一键翻译店铺所有内容：商品、页面、Theme 按钮/导航/UI 文本。执行一次后，用户切换语言时无需等待。
-        </p>
-        <div style="display:flex; gap:8px; align-items:center;">
-          <button class="btn btn-primary" id="btn-translate-all">全站翻译</button>
-          <button class="btn hidden" id="btn-pause-all" style="background:#f5f5f5;color:#333;">暂停</button>
-          <span id="all-progress-text" style="font-size:13px; color:#666;"></span>
-        </div>
-        <div id="all-progress" class="progress-area hidden" style="margin-top:12px;">
-          <div class="progress-bar"><div class="progress-fill" id="all-progress-fill"></div></div>
-          <div class="progress-info" id="all-progress-detail">准备中...</div>
-        </div>
-      </div>
-
-      <div class="card">
-        <div class="card-title" style="display:flex;justify-content:space-between;align-items:center;">
-          <div>
-            翻译统计
-            <span id="stat-provider-badge" style="font-size:12px;color:#888;font-weight:normal;margin-left:8px;"></span>
-          </div>
-          <button class="btn" id="btn-refresh-stats" style="background:#1976d2;color:#fff;font-size:12px;padding:6px 14px;border:none;">刷新</button>
-        </div>
-        <!-- 第一行：翻译引擎调用统计 -->
-        <div class="stats-grid" id="stats-grid-engine">
-          <div class="stat-card">
-            <div class="stat-value" id="stat-products">0</div>
-            <div class="stat-label">已翻译商品</div>
-          </div>
-          <div class="stat-card green">
-            <div class="stat-value" id="stat-pages">0</div>
-            <div class="stat-label">已翻译页面</div>
-          </div>
-          <div class="stat-card orange">
-            <div class="stat-value" id="stat-api">0</div>
-            <div class="stat-label">API 调用次数</div>
-          </div>
-        </div>
-        <!-- 第二行：AI Token 消耗统计（仅 AI 引擎显示） -->
-        <div class="stats-grid hidden" id="stats-grid-tokens" style="margin-top:12px;">
-          <div class="stat-card" style="background:linear-gradient(135deg,#667eea 0%,#764ba2 100%);">
-            <div class="stat-value" id="stat-input-tokens">0</div>
-            <div class="stat-label">Input Tokens</div>
-          </div>
-          <div class="stat-card green" style="background:linear-gradient(135deg,#11998e 0%,#38ef7d 100%);">
-            <div class="stat-value" id="stat-output-tokens">0</div>
-            <div class="stat-label">Output Tokens</div>
-          </div>
-          <div class="stat-card orange" style="background:linear-gradient(135deg,#fc4a1a 0%,#f7b733 100%);">
-            <div class="stat-value" id="stat-total-tokens">0</div>
-            <div class="stat-label">总 Tokens</div>
-          </div>
-        </div>
-        <p class="hidden" id="token-unit-hint" style="font-size:12px;color:#888;margin-top:8px;">* Token 是 AI 模型的计费单位，1K = 1000 tokens。Input 是你发送的文本量，Output 是模型返回的翻译结果量。</p>
-      </div>
-
-      <div class="card">
         <div class="card-title">支持语言</div>
         <div id="language-list">
           <span class="lang-tag active">🇺🇸 英文</span>
@@ -575,57 +518,14 @@
 
     <!-- 设置页 -->
     <div id="tab-settings" class="tab-content hidden">
-      <!-- 翻译引擎配置 -->
       <div class="card">
-        <div class="card-title">翻译引擎配置</div>
-
-        <div class="form-group">
-          <label class="form-label">翻译引擎</label>
-          <select class="form-select" id="translate-provider" style="max-width:100%;">
-            <option value="baidu">百度翻译（需自行注册并配置密钥）</option>
-            <option value="openai-compat">AI 翻译 — OpenAI 兼容（DeepSeek / Kimi 官方 / OpenAI）</option>
-            <option value="anthropic-compat">AI 翻译 — Anthropic 兼容（Claude / Kimi Coding）</option>
-          </select>
-          <!-- 引擎状态/错误提示条 -->
-          <div id="engine-alert" class="hidden" style="margin-top:10px;padding:10px 14px;border-radius:8px;font-size:13px;"></div>
-          <p style="font-size:12px;color:#888;margin-top:6px;line-height:1.5;" id="provider-desc">
-            百度翻译：需前往 <a href="https://fanyi-api.baidu.com/" target="_blank" style="color:#1976d2;">百度翻译开放平台</a> 注册并获取 App ID 和 Secret Key。标准版每月 5 万字符免费额度。
+        <div class="card-title">翻译引擎</div>
+        <div style="padding:16px;background:#e8f5e9;border-radius:8px;border-left:4px solid #4caf50;">
+          <p style="font-size:14px;color:#2e7d32;margin:0;line-height:1.6;">
+            <strong>Google Translate 免费组件</strong><br>
+            前端实时翻译，零成本、无需配置 API 密钥。支持 100+ 种语言自动翻译，自动识别网页原文语言。
           </p>
         </div>
-
-        <div id="ai-config-panel" class="hidden" style="border-top:1px solid #eee;padding-top:16px;margin-top:16px;">
-          <div class="form-group" id="endpoint-group">
-            <label class="form-label" id="endpoint-label">API 地址（Base URL）</label>
-            <input type="text" class="form-input" id="translate-endpoint" placeholder="https://api.deepseek.com" style="max-width:100%;">
-            <p style="font-size:12px;color:#888;margin-top:4px;" id="endpoint-hint">如 DeepSeek: https://api.deepseek.com，Kimi: https://api.moonshot.cn</p>
-          </div>
-          <div class="form-group">
-            <label class="form-label" id="api-key-label">API Key</label>
-            <input type="password" class="form-input" id="translate-api-key" placeholder="sk-xxxxxxxx" style="max-width:100%;">
-            <p style="font-size:12px;color:#888;margin-top:4px;">您的密钥将被加密存储，仅用于发起翻译请求</p>
-          </div>
-          <div class="form-group" id="api-secret-group">
-            <label class="form-label" id="api-secret-label">Secret Key</label>
-            <input type="password" class="form-input" id="translate-api-secret" placeholder="" style="max-width:100%;">
-            <p style="font-size:12px;color:#888;margin-top:4px;" id="api-secret-hint">百度翻译必填，AI 翻译一般不需要</p>
-          </div>
-          <div class="form-group" id="model-group">
-            <label class="form-label">模型名称（可选）</label>
-            <input type="text" class="form-input" id="translate-model" placeholder="deepseek-chat" style="max-width:100%;">
-            <p style="font-size:12px;color:#888;margin-top:4px;" id="model-hint">留空则使用各平台默认模型（DeepSeek: deepseek-chat, Kimi: moonshot-v1-8k）</p>
-          </div>
-
-          <div style="display:flex;gap:10px;align-items:center;margin-top:8px;">
-            <button class="btn" id="btn-test-connection" style="background:#f5f5f5;color:#333;font-size:13px;padding:8px 18px;">
-              测试连接
-            </button>
-            <span id="test-connection-status" style="font-size:13px;"></span>
-          </div>
-        </div>
-
-        <button class="btn btn-success" id="btn-save-translate-config" style="margin-top:16px;">
-          保存翻译引擎配置
-        </button>
       </div>
 
       <div class="card">
@@ -814,312 +714,7 @@
       }
     }
 
-    // 加载翻译统计
-    async function loadStats() {
-      if (!currentShop) return;
-      try {
-        const res = await fetch(`${API_BASE}/translate/stats?shop=${currentShop}`);
-        if (res.ok) {
-          const data = await res.json();
-          const provider = data.provider || 'baidu';
-
-          // 引擎标识
-          const badge = document.getElementById('stat-provider-badge');
-          if (badge) {
-            badge.textContent = provider === 'baidu'
-              ? '（百度翻译）'
-              : provider === 'openai-compat'
-                ? '（OpenAI 兼容）'
-                : provider === 'anthropic-compat'
-                  ? '（Anthropic 兼容）'
-                  : '';
-          }
-
-          // 更新引擎统计（所有引擎都显示）
-          document.getElementById('stat-products').textContent = data.translatedProducts || 0;
-          document.getElementById('stat-pages').textContent = data.translatedPages || 0;
-          document.getElementById('stat-api').textContent = data.apiCalls || 0;
-
-          // AI 引擎额外显示 Token 消耗
-          const tokenGrid = document.getElementById('stats-grid-tokens');
-          const tokenHint = document.getElementById('token-unit-hint');
-          if (provider === 'baidu') {
-            tokenGrid.classList.add('hidden');
-            tokenHint.classList.add('hidden');
-          } else {
-            tokenGrid.classList.remove('hidden');
-            tokenHint.classList.remove('hidden');
-            document.getElementById('stat-input-tokens').textContent = (data.totalInputTokens || 0).toLocaleString();
-            document.getElementById('stat-output-tokens').textContent = (data.totalOutputTokens || 0).toLocaleString();
-            document.getElementById('stat-total-tokens').textContent = ((data.totalInputTokens || 0) + (data.totalOutputTokens || 0)).toLocaleString();
-          }
-        } else {
-          console.error('[Translator Admin] 加载统计失败:', res.status);
-        }
-      } catch (e) {
-        console.error('[Translator Admin] 加载统计异常:', e);
-      }
-    }
-
-    // 加载商品列表
-    async function loadProducts() {
-      const tbody = document.getElementById('product-list');
-      if (!tbody) return;
-
-      if (!currentShop) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">请先完成店铺授权</td></tr>';
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_BASE}/shopify/products?shop=${currentShop}&limit=20`);
-        if (res.ok) {
-          const data = await res.json();
-
-          if (!data.products || data.products.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">暂无商品</td></tr>';
-            return;
-          }
-
-          tbody.innerHTML = data.products.map(p => `
-            <tr data-id="${p.id}">
-              <td>${p.title}</td>
-              <td>${p.product_type || '-'}</td>
-              <td><span class="badge ${p.status === 'active' ? 'badge-success' : 'badge-warning'}">${p.status}</span></td>
-              <td><span class="badge badge-warning" id="product-status-${p.id}">未翻译</span></td>
-            </tr>
-          `).join('');
-
-          // 查询翻译状态
-          const ids = data.products.map(p => p.id).join(',');
-          await updateTranslationStatus('product', ids, 'product-status');
-        } else {
-          const err = await res.json().catch(() => ({}));
-          console.error('[Translator Admin] 加载商品失败:', res.status, err);
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#f44336;">加载失败 (${res.status}): ${err.error || '未知错误'}</td></tr>`;
-        }
-      } catch (e) {
-        console.error('[Translator Admin] 加载商品异常:', e);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#f44336;">网络错误，请检查连接</td></tr>';
-      }
-    }
-
-    // 通用：更新翻译状态
-    async function updateTranslationStatus(resourceType, resourceIds, prefix) {
-      if (!currentShop || !resourceIds) return;
-      try {
-        const res = await fetch(`${API_BASE}/translate/status?shop=${currentShop}&resourceType=${resourceType}&resourceIds=${resourceIds}`);
-        if (res.ok) {
-          const data = await res.json();
-          for (const [id, langs] of Object.entries(data.statuses)) {
-            const statuses = Object.values(langs);
-            const allTranslated = statuses.length > 0 && statuses.every(s => s === 'translated');
-            const someTranslated = statuses.some(s => s === 'translated');
-            const el = document.getElementById(`${prefix}-${id}`);
-            if (el) {
-              if (allTranslated) {
-                el.className = 'badge badge-success';
-                el.textContent = '已翻译';
-              } else if (someTranslated) {
-                el.className = 'badge badge-info';
-                el.textContent = '部分翻译';
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to load translation status', e);
-      }
-    }
-
-    // 加载页面列表
-    async function loadPages() {
-      const tbody = document.getElementById('page-list');
-      if (!tbody) return;
-
-      if (!currentShop) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">请先完成店铺授权</td></tr>';
-        return;
-      }
-
-      try {
-        const res = await fetch(`${API_BASE}/shopify/pages?shop=${currentShop}&limit=20`);
-        if (res.ok) {
-          const data = await res.json();
-
-          if (!data.pages || data.pages.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#999;">暂无页面</td></tr>';
-            return;
-          }
-
-          tbody.innerHTML = data.pages.map(p => `
-            <tr data-id="${p.id}">
-              <td>${p.title}</td>
-              <td>${p.author || '-'}</td>
-              <td>${new Date(p.updated_at).toLocaleDateString()}</td>
-              <td><span class="badge badge-warning" id="page-status-${p.id}">未翻译</span></td>
-            </tr>
-          `).join('');
-
-          // 查询翻译状态
-          const ids = data.pages.map(p => p.id).join(',');
-          await updateTranslationStatus('page', ids, 'page-status');
-        } else {
-          const err = await res.json().catch(() => ({}));
-          console.error('[Translator Admin] 加载页面失败:', res.status, err);
-          tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#f44336;">加载失败 (${res.status}): ${err.error || '未知错误'}</td></tr>`;
-        }
-      } catch (e) {
-        console.error('[Translator Admin] 加载页面异常:', e);
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color:#f44336;">网络错误，请检查连接</td></tr>';
-      }
-    }
-
-    // 全部翻译逻辑
-    async function startTranslateAll(type) {
-      const configMap = {
-        products: { btnId: 'btn-translate-products', progressId: 'product-progress', fillId: 'product-progress-fill', textId: 'product-progress-text', btnText: '全部翻译' },
-        pages: { btnId: 'btn-translate-pages', progressId: 'page-progress', fillId: 'page-progress-fill', textId: 'page-progress-text', btnText: '全部翻译' },
-        theme: { btnId: 'btn-translate-theme', progressId: 'theme-progress', fillId: 'theme-progress-fill', textId: 'theme-progress-detail', btnText: '翻译 Theme' },
-        all: { btnId: 'btn-translate-all', progressId: 'all-progress', fillId: 'all-progress-fill', textId: 'all-progress-detail', btnText: '全站翻译' },
-      };
-      const cfg = configMap[type];
-      if (!cfg) return;
-
-      const btn = document.getElementById(cfg.btnId);
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> 准备中...';
-
-      document.getElementById(cfg.progressId).classList.remove('hidden');
-      document.getElementById(cfg.fillId).style.width = '0%';
-      document.getElementById(cfg.textId).textContent = '正在启动翻译任务...';
-
-      try {
-        const res = await fetch(`${API_BASE}/translate/all`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ shop: currentShop, type }),
-        });
-
-        if (!res.ok) {
-          const err = await res.json();
-          showToast(err.error || '启动失败', 'error');
-          btn.disabled = false;
-          btn.innerHTML = cfg.btnText;
-          return;
-        }
-
-        const data = await res.json();
-        window._currentTranslateJobId = data.jobId;
-        pollJobStatus(data.jobId, type);
-      } catch (e) {
-        showToast('启动失败: ' + e.message, 'error');
-        btn.disabled = false;
-        btn.innerHTML = cfg.btnText;
-      }
-    }
-
-    function pollJobStatus(jobId, type) {
-      const configMap = {
-        products: { btnId: 'btn-translate-products', progressId: 'product-progress', fillId: 'product-progress-fill', textId: 'product-progress-text', btnText: '全部翻译' },
-        pages: { btnId: 'btn-translate-pages', progressId: 'page-progress', fillId: 'page-progress-fill', textId: 'page-progress-text', btnText: '全部翻译' },
-        theme: { btnId: 'btn-translate-theme', progressId: 'theme-progress', fillId: 'theme-progress-fill', textId: 'theme-progress-detail', btnText: '翻译 Theme' },
-        all: { btnId: 'btn-translate-all', progressId: 'all-progress', fillId: 'all-progress-fill', textId: 'all-progress-detail', btnText: '全站翻译' },
-      };
-      const cfg = configMap[type];
-      if (!cfg) return;
-      // 显示暂停按钮（仅全站翻译）
-      const pauseBtn = document.getElementById('btn-pause-all');
-      if (pauseBtn) { pauseBtn.classList.remove('hidden'); pauseBtn.textContent = '暂停'; }
-      let isPaused = false;
-
-      const interval = setInterval(async () => {
-        try {
-          const res = await fetch(`${API_BASE}/translate/job/${jobId}`);
-          const job = await res.json();
-
-          const total = job.total || 0;
-          const processed = job.processed || 0;
-          const percent = total > 0 ? Math.round((processed / total) * 100) : 0;
-          document.getElementById(cfg.fillId).style.width = percent + '%';
-          const statusLabel = job.paused ? '已暂停' : (job.message || '准备中...');
-          document.getElementById(cfg.textId).textContent =
-            `${statusLabel} (${processed}/${total}${job.failed > 0 ? `, ${job.failed}个失败` : ''})`;
-
-          if (job.paused) {
-            if (pauseBtn) pauseBtn.textContent = '继续';
-            document.getElementById(cfg.btnId).innerHTML = '已暂停';
-            isPaused = true;
-          } else {
-            if (pauseBtn) pauseBtn.textContent = '暂停';
-            if (job.status !== 'completed' && job.status !== 'failed') {
-              document.getElementById(cfg.btnId).innerHTML = '<span class="spinner"></span> 翻译中...';
-            }
-            isPaused = false;
-          }
-
-          if (job.status === 'completed') {
-            clearInterval(interval);
-            if (pauseBtn) pauseBtn.classList.add('hidden');
-            document.getElementById(cfg.fillId).style.width = '100%';
-            document.getElementById(cfg.textId).textContent = job.message;
-            document.getElementById(cfg.btnId).disabled = false;
-            document.getElementById(cfg.btnId).innerHTML = cfg.btnText;
-            window._currentTranslateJobId = null;
-            showToast('翻译完成！');
-            await loadStats();
-          } else if (job.status === 'failed') {
-            clearInterval(interval);
-            if (pauseBtn) pauseBtn.classList.add('hidden');
-            document.getElementById(cfg.btnId).disabled = false;
-            document.getElementById(cfg.btnId).innerHTML = cfg.btnText;
-            window._currentTranslateJobId = null;
-            showToast('翻译失败: ' + job.message, 'error');
-          }
-        } catch (e) {
-          console.error('Poll error', e);
-        }
-      }, 1500);
-    }
-
-    document.getElementById('btn-translate-all').addEventListener('click', () => startTranslateAll('all'));
-
-    document.getElementById('btn-pause-all').addEventListener('click', async function() {
-      const btn = this;
-      const currentJobId = window._currentTranslateJobId;
-      if (!currentJobId) return;
-      try {
-        const isPause = btn.textContent === '暂停';
-        const res = await fetch(`${API_BASE}/translate/job/${currentJobId}/${isPause ? 'pause' : 'resume'}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-        });
-        if (res.ok) {
-          btn.textContent = isPause ? '继续' : '暂停';
-        }
-      } catch (e) {
-        console.error('Pause/resume error', e);
-      }
-    });
-
-    // 刷新按钮
-    document.getElementById('btn-refresh-stats').addEventListener('click', async function() {
-      const btn = this;
-      btn.disabled = true;
-      btn.textContent = '刷新中...';
-      try {
-        await loadStats();
-        await loadProducts();
-        await loadPages();
-        showToast('数据已刷新');
-      } catch (e) {
-        console.error('[Refresh Error]', e);
-        showToast('刷新出错: ' + e.message, 'error');
-      } finally {
-        btn.textContent = '刷新';
-        btn.disabled = false;
-      }
-    });
+    // v6.0+：Google Translate 免费组件在前端实时翻译，后端无需预翻译和缓存
 
     // 内置语言列表
     const BUILTIN_LANGS = [
@@ -1132,30 +727,30 @@
 
     // 可添加的扩展语言列表（下拉选择）
     const EXTRA_LANGS = [
-      { code: 'th', name: '泰文', flag: '🇹🇭', baiduCode: 'th' },
-      { code: 'de', name: '德文', flag: '🇩🇪', baiduCode: 'de' },
-      { code: 'ja', name: '日文', flag: '🇯🇵', baiduCode: 'jp' },
-      { code: 'ko', name: '韩文', flag: '🇰🇷', baiduCode: 'kor' },
-      { code: 'ru', name: '俄文', flag: '🇷🇺', baiduCode: 'ru' },
-      { code: 'pt', name: '葡萄牙文', flag: '🇵🇹', baiduCode: 'pt' },
-      { code: 'it', name: '意大利文', flag: '🇮🇹', baiduCode: 'it' },
-      { code: 'nl', name: '荷兰文', flag: '🇳🇱', baiduCode: 'nl' },
-      { code: 'tr', name: '土耳其文', flag: '🇹🇷', baiduCode: 'tr' },
-      { code: 'pl', name: '波兰文', flag: '🇵🇱', baiduCode: 'pl' },
-      { code: 'vi', name: '越南文', flag: '🇻🇳', baiduCode: 'vie' },
-      { code: 'id', name: '印尼文', flag: '🇮🇩', baiduCode: 'id' },
-      { code: 'ms', name: '马来文', flag: '🇲🇾', baiduCode: 'ms' },
-      { code: 'hi', name: '印地文', flag: '🇮🇳', baiduCode: 'hi' },
-      { code: 'sv', name: '瑞典文', flag: '🇸🇪', baiduCode: 'swe' },
-      { code: 'da', name: '丹麦文', flag: '🇩🇰', baiduCode: 'dan' },
-      { code: 'fi', name: '芬兰文', flag: '🇫🇮', baiduCode: 'fin' },
-      { code: 'no', name: '挪威文', flag: '🇳🇴', baiduCode: 'nor' },
-      { code: 'cs', name: '捷克文', flag: '🇨🇿', baiduCode: 'cs' },
-      { code: 'el', name: '希腊文', flag: '🇬🇷', baiduCode: 'el' },
-      { code: 'hu', name: '匈牙利文', flag: '🇭🇺', baiduCode: 'hu' },
-      { code: 'ro', name: '罗马尼亚文', flag: '🇷🇴', baiduCode: 'ro' },
-      { code: 'uk', name: '乌克兰文', flag: '🇺🇦', baiduCode: 'ukr' },
-      { code: 'he', name: '希伯来文', flag: '🇮🇱', baiduCode: 'heb' },
+      { code: 'th', name: '泰文', flag: '🇹🇭' },
+      { code: 'de', name: '德文', flag: '🇩🇪' },
+      { code: 'ja', name: '日文', flag: '🇯🇵' },
+      { code: 'ko', name: '韩文', flag: '🇰🇷' },
+      { code: 'ru', name: '俄文', flag: '🇷🇺' },
+      { code: 'pt', name: '葡萄牙文', flag: '🇵🇹' },
+      { code: 'it', name: '意大利文', flag: '🇮🇹' },
+      { code: 'nl', name: '荷兰文', flag: '🇳🇱' },
+      { code: 'tr', name: '土耳其文', flag: '🇹🇷' },
+      { code: 'pl', name: '波兰文', flag: '🇵🇱' },
+      { code: 'vi', name: '越南文', flag: '🇻🇳' },
+      { code: 'id', name: '印尼文', flag: '🇮🇩' },
+      { code: 'ms', name: '马来文', flag: '🇲🇾' },
+      { code: 'hi', name: '印地文', flag: '🇮🇳' },
+      { code: 'sv', name: '瑞典文', flag: '🇸🇪' },
+      { code: 'da', name: '丹麦文', flag: '🇩🇰' },
+      { code: 'fi', name: '芬兰文', flag: '🇫🇮' },
+      { code: 'no', name: '挪威文', flag: '🇳🇴' },
+      { code: 'cs', name: '捷克文', flag: '🇨🇿' },
+      { code: 'el', name: '希腊文', flag: '🇬🇷' },
+      { code: 'hu', name: '匈牙利文', flag: '🇭🇺' },
+      { code: 'ro', name: '罗马尼亚文', flag: '🇷🇴' },
+      { code: 'uk', name: '乌克兰文', flag: '🇺🇦' },
+      { code: 'he', name: '希伯来文', flag: '🇮🇱' },
     ];
 
     let customLangs = []; // 当前店铺自定义语言
@@ -1224,287 +819,6 @@
       }
     }
 
-    // ========== 翻译引擎配置 ==========
-
-    async function loadTranslateConfig() {
-      if (!currentShop) return;
-      try {
-        const res = await fetch(`${API_BASE}/translate/config?shop=${currentShop}`);
-        if (res.ok) {
-          const cfg = await res.json();
-          const providerSelect = document.getElementById('translate-provider');
-          providerSelect.value = cfg.provider || 'baidu';
-          updateProviderDesc(cfg.provider || 'baidu');
-
-          // 所有引擎都需要配置面板
-          document.getElementById('ai-config-panel').classList.remove('hidden');
-          document.getElementById('translate-endpoint').value = cfg.endpoint || '';
-          document.getElementById('translate-model').value = cfg.model || '';
-          if (cfg.apiKeyMasked) {
-            document.getElementById('translate-api-key').placeholder = `已配置: ${cfg.apiKeyMasked}`;
-          }
-          if (cfg.hasApiSecret) {
-            document.getElementById('translate-api-secret').placeholder = '已配置: ********';
-          }
-
-          // 自动检测引擎状态（配置完整时才检测）
-          if (cfg.apiKeyMasked) {
-            checkEngineStatus(cfg.provider);
-          }
-        }
-      } catch (e) {
-        console.error('Failed to load translate config', e);
-      }
-    }
-
-    // 检测引擎状态并显示提示
-    async function checkEngineStatus(provider) {
-      try {
-        const res = await fetch(`${API_BASE}/translate/test-connection`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider, shop: currentShop }),
-        });
-        const data = await res.json();
-        const alertEl = document.getElementById('engine-alert');
-        if (!data.success) {
-          alertEl.classList.remove('hidden');
-          alertEl.style.background = '#ffebee';
-          alertEl.style.color = '#c62828';
-          alertEl.style.border = '1px solid #ef9a9a';
-          alertEl.innerHTML = `<strong>⚠ 引擎异常</strong>：${data.message || '连接失败'}<br>
-            <span style="font-size:12px;">请检查配置是否正确，或前往对应平台查看账户状态。</span>`;
-        } else {
-          alertEl.classList.add('hidden');
-        }
-      } catch (e) {
-        console.error('Engine status check failed', e);
-      }
-    }
-
-    function updateProviderDesc(provider) {
-      const desc = document.getElementById('provider-desc');
-      const endpointGroup = document.getElementById('endpoint-group');
-      const endpointLabel = document.getElementById('endpoint-label');
-      const endpointHint = document.getElementById('endpoint-hint');
-      const apiKeyLabel = document.getElementById('api-key-label');
-      const modelGroup = document.getElementById('model-group');
-      const modelHint = document.getElementById('model-hint');
-      const apiKeyInput = document.getElementById('translate-api-key');
-      const endpointInput = document.getElementById('translate-endpoint');
-      const modelInput = document.getElementById('translate-model');
-      const apiSecretGroup = document.getElementById('api-secret-group');
-      const apiSecretLabel = document.getElementById('api-secret-label');
-      const apiSecretHint = document.getElementById('api-secret-hint');
-
-      if (provider === 'baidu') {
-        desc.innerHTML = '百度翻译：需前往 <a href="https://fanyi-api.baidu.com/" target="_blank" style="color:#1976d2;">百度翻译开放平台</a> 注册账号，在「管理控制台」获取 App ID 和 Secret Key。标准版每月 5 万字符免费额度。';
-        endpointGroup.classList.add('hidden');
-        modelGroup.classList.add('hidden');
-        apiSecretGroup.classList.remove('hidden');
-        apiKeyLabel.textContent = 'App ID';
-        apiKeyInput.placeholder = '20230710001xxxxx';
-        apiSecretLabel.textContent = 'Secret Key';
-        apiSecretHint.textContent = '在百度翻译开放平台「管理控制台」获取';
-        modelHint.textContent = '';
-      } else if (provider === 'openai-compat') {
-        desc.innerHTML = 'OpenAI 兼容格式：使用 <code>/chat/completions</code> 接口和 <code>Authorization: Bearer</code> 认证。支持 DeepSeek、Kimi 官方、SiliconFlow、OpenAI 等。';
-        endpointGroup.classList.remove('hidden');
-        modelGroup.classList.remove('hidden');
-        apiSecretGroup.classList.add('hidden');
-        endpointLabel.textContent = 'API 地址（Base URL）';
-        endpointHint.textContent = '如 DeepSeek: https://api.deepseek.com，Kimi: https://api.moonshot.cn';
-        apiKeyLabel.textContent = 'API Key';
-        apiKeyInput.placeholder = 'sk-xxxxxxxx';
-        endpointInput.placeholder = 'https://api.deepseek.com';
-        modelInput.placeholder = 'deepseek-chat';
-        modelHint.textContent = '留空则使用各平台默认模型（DeepSeek: deepseek-chat, Kimi: moonshot-v1-8k）';
-      } else if (provider === 'anthropic-compat') {
-        desc.innerHTML = 'Anthropic 兼容格式：使用 <code>/v1/messages</code> 接口和 <code>x-api-key</code> 认证。支持 Claude API、Kimi Coding 代理等。';
-        endpointGroup.classList.remove('hidden');
-        modelGroup.classList.remove('hidden');
-        apiSecretGroup.classList.add('hidden');
-        endpointLabel.textContent = 'API 地址（Base URL）';
-        endpointHint.textContent = '如 Kimi Coding: https://api.kimi.com/coding';
-        apiKeyLabel.textContent = 'API Key';
-        apiKeyInput.placeholder = 'sk-xxxxxxxx';
-        endpointInput.placeholder = 'https://api.kimi.com/coding';
-        modelInput.placeholder = 'moonshot-v1-8k';
-        modelHint.textContent = '留空则使用默认模型（claude-3-haiku-20240307）';
-      }
-    }
-
-    // 切换引擎时更新面板
-    document.getElementById('translate-provider').addEventListener('change', function() {
-      const provider = this.value;
-      updateProviderDesc(provider);
-      document.getElementById('ai-config-panel').classList.remove('hidden');
-    });
-
-    // 测试连接
-    document.getElementById('btn-test-connection').addEventListener('click', async function() {
-      const btn = this;
-      const statusEl = document.getElementById('test-connection-status');
-      const endpoint = document.getElementById('translate-endpoint').value.trim();
-      const apiKeyInput = document.getElementById('translate-api-key');
-      const apiKey = apiKeyInput.value.trim();
-      const apiSecretInput = document.getElementById('translate-api-secret');
-      const apiSecret = apiSecretInput ? apiSecretInput.value.trim() : '';
-      const model = document.getElementById('translate-model').value.trim();
-      const hasSavedKey = apiKeyInput.placeholder.includes('已配置');
-      const provider = document.getElementById('translate-provider').value;
-
-      // 验证
-      if (provider !== 'baidu' && !endpoint) {
-        statusEl.innerHTML = '<span style="color:#f44336;">请先填写 API 地址</span>';
-        return;
-      }
-      if (!apiKey && !hasSavedKey) {
-        const label = provider === 'baidu' ? 'App ID' : 'API Key';
-        statusEl.innerHTML = `<span style="color:#f44336;">请先填写 ${label}</span>`;
-        return;
-      }
-      if (provider === 'baidu' && !apiSecret && !hasSavedKey) {
-        statusEl.innerHTML = '<span style="color:#f44336;">请先填写 Secret Key</span>';
-        return;
-      }
-
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> 测试中...';
-      statusEl.textContent = '';
-
-      try {
-        const body = {
-          provider,
-          endpoint: endpoint || undefined,
-          model: model || undefined,
-        };
-        if (apiKey) {
-          body.apiKey = apiKey;
-        }
-        if (apiSecret) {
-          body.apiSecret = apiSecret;
-        }
-        // 如果没有提供 apiKey 但有已保存的 key，带上 shop 让后端读取数据库
-        if (!apiKey && hasSavedKey) {
-          body.shop = currentShop;
-        }
-
-        const res = await fetch(`${API_BASE}/translate/test-connection`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
-
-        const data = await res.json();
-        if (data.success) {
-          statusEl.innerHTML = '<span style="color:#4caf50;">✓ 连接成功</span>';
-        } else {
-          statusEl.innerHTML = `<span style="color:#f44336;">✗ ${data.message || '连接失败'}</span>`;
-        }
-      } catch (e) {
-        statusEl.innerHTML = '<span style="color:#f44336;">✗ 请求异常</span>';
-      } finally {
-        btn.disabled = false;
-        btn.textContent = '测试连接';
-      }
-    });
-
-    // 保存翻译引擎配置
-    async function saveTranslateConfigInternal(confirmReTranslate) {
-      const provider = document.getElementById('translate-provider').value;
-      const endpoint = document.getElementById('translate-endpoint').value.trim();
-      const apiKey = document.getElementById('translate-api-key').value.trim();
-      const apiSecret = document.getElementById('translate-api-secret').value.trim();
-      const model = document.getElementById('translate-model').value.trim();
-      const hasSavedKey = document.getElementById('translate-api-key').placeholder.includes('已配置');
-      const hasSavedSecret = document.getElementById('translate-api-secret').placeholder.includes('已配置');
-
-      if (provider === 'baidu') {
-        if (!apiKey && !hasSavedKey) {
-          showToast('请填写 App ID', 'error');
-          return { ok: false };
-        }
-        if (!apiSecret && !hasSavedSecret) {
-          showToast('请填写 Secret Key', 'error');
-          return { ok: false };
-        }
-      } else if (['openai-compat', 'anthropic-compat'].includes(provider)) {
-        if (!endpoint) {
-          showToast('请填写 API 地址', 'error');
-          return { ok: false };
-        }
-        if (!apiKey && !hasSavedKey) {
-          showToast('请填写 API Key', 'error');
-          return { ok: false };
-        }
-      }
-
-      const res = await fetch(`${API_BASE}/translate/config`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          shop: currentShop,
-          provider,
-          endpoint: endpoint || null,
-          apiKey: apiKey || undefined,
-          apiSecret: apiSecret || undefined,
-          model: model || null,
-          confirmReTranslate: !!confirmReTranslate,
-        }),
-      });
-
-      return { ok: res.ok, data: await res.json().catch(() => ({})) };
-    }
-
-    document.getElementById('btn-save-translate-config').addEventListener('click', async function() {
-      const btn = this;
-      btn.disabled = true;
-
-      // 先尝试保存（不确认重翻）
-      const result = await saveTranslateConfigInternal(false);
-
-      if (!result.ok) {
-        showToast(result.data?.error || '保存失败', 'error');
-        btn.disabled = false;
-        return;
-      }
-
-      // 后端要求确认（切换到了 AI 且需要全量重翻）
-      if (result.data?.requireConfirm) {
-        const count = result.data.translatedCount || 0;
-        const confirmed = confirm(
-          `切换到 AI 翻译将触发全站重翻，所有已翻译内容将重新翻译。\n\n` +
-          `当前已翻译条目数：约 ${count} 条\n\n` +
-          `注意：这会使用您的 API Key 产生相应费用，请确保 API 账户有足够余额。\n\n` +
-          `点击"确定"继续保存并触发全量重翻，点击"取消"则放弃保存。`
-        );
-
-        if (!confirmed) {
-          btn.disabled = false;
-          return;
-        }
-
-        // 用户确认，再次保存并触发重翻
-        const confirmResult = await saveTranslateConfigInternal(true);
-        if (confirmResult.ok && confirmResult.data?.success) {
-          showToast(confirmResult.data.message || '配置已保存');
-          // 如果触发了全量重翻，自动启动全站翻译
-          if (confirmResult.data.reTranslateTriggered) {
-            setTimeout(() => startTranslateAll('all'), 500);
-          }
-        } else {
-          showToast(confirmResult.data?.error || '保存失败', 'error');
-        }
-        btn.disabled = false;
-        return;
-      }
-
-      // 正常保存成功
-      showToast(result.data?.message || '配置已保存');
-      btn.disabled = false;
-    });
-
     // 添加语言弹窗
     // 填充语言下拉框
     function populateLangSelect() {
@@ -1542,7 +856,7 @@
       if (lang) {
         document.getElementById('preview-flag').textContent = lang.flag;
         document.getElementById('preview-name').textContent = lang.name;
-        document.getElementById('preview-code').textContent = `ISO: ${lang.code} · 百度: ${lang.baiduCode}`;
+        document.getElementById('preview-code').textContent = `ISO: ${lang.code}`;
         preview.classList.remove('hidden');
         saveBtn.disabled = false;
       }
@@ -1589,7 +903,7 @@
       }
 
       // 直接添加，所有参数从 EXTRA_LANGS 获取
-      customLangs.push({ code: lang.code, name: lang.name, flag: lang.flag, baiduCode: lang.baiduCode });
+      customLangs.push({ code: lang.code, name: lang.name, flag: lang.flag });
       const currentConfig = {
         enabledLanguages: getEnabledLangCodes().join(','),
         customLanguages: JSON.stringify(customLangs),
@@ -1601,22 +915,9 @@
       document.getElementById('add-lang-modal').classList.add('hidden');
       clearLangModal();
 
-      // 弹窗确认是否进行全量翻译
-      if (!confirm(`已添加 ${name}。\n\n新语言需要进行全量翻译才能在前端正常显示。是否立即开始全站翻译？\n\n（点击"确定"将自动保存设置并启动翻译；点击"取消"仅保存设置，后续可手动点击"全站翻译"）`)) {
-        // 用户取消：仅保存设置
-        const saved = await saveSettingsInternal();
-        showToast(saved ? '设置已保存' : '保存失败', saved ? 'success' : 'error');
-        return;
-      }
-
-      // 用户确定：保存设置并启动全站翻译
+      // 保存设置
       const saved = await saveSettingsInternal();
-      if (!saved) {
-        showToast('保存设置失败，未启动翻译', 'error');
-        return;
-      }
-      showToast('设置已保存，正在启动全站翻译...');
-      startTranslateAll('all');
+      showToast(saved ? '设置已保存' : '保存失败', saved ? 'success' : 'error');
     });
 
     function clearLangModal() {
@@ -1665,30 +966,6 @@
       }
     });
 
-    // 页面加载时检查是否有进行中的翻译任务
-    async function checkActiveJobs() {
-      if (!currentShop) return;
-      try {
-        const res = await fetch(`${API_BASE}/translate/active-jobs?shop=${currentShop}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.jobs && data.jobs.length > 0) {
-            for (const job of data.jobs) {
-              if (job.type === 'all') {
-                document.getElementById('all-progress').classList.remove('hidden');
-                document.getElementById('btn-translate-all').disabled = true;
-                document.getElementById('btn-translate-all').innerHTML = '<span class="spinner"></span> 翻译中...';
-                window._currentTranslateJobId = job.id;
-                pollJobStatus(job.id, 'all');
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to check active jobs', e);
-      }
-    }
-
     // 初始化
     async function init() {
       const shopInfo = await loadShopInfo();
@@ -1705,10 +982,7 @@
       // 授权成功，重置重定向计数
       sessionStorage.removeItem('translator_auth_redirect');
 
-      await loadStats();
       await loadSettings();
-      await loadTranslateConfig();
-      await checkActiveJobs();
     }
 
     init();

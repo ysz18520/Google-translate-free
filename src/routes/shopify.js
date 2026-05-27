@@ -1,5 +1,4 @@
 const express = require('express');
-const crypto = require('crypto');
 const axios = require('axios');
 const config = require('../config');
 const shopifyService = require('../services/shopify');
@@ -25,7 +24,6 @@ router.get('/auth', async (req, res) => {
   }
 
   try {
-    // 使用官方 SDK 生成授权 URL，isOnline: false 确保获取 shpat_ 离线令牌
     const authUrl = await shopify.auth.begin({
       shop: shopDomain,
       callbackPath: '/api/shopify/callback',
@@ -34,7 +32,6 @@ router.get('/auth', async (req, res) => {
       rawResponse: res,
     });
 
-    // 非 embedded app 下，begin 返回 URL，需要手动 redirect
     if (authUrl) {
       return res.redirect(authUrl);
     }
@@ -50,7 +47,6 @@ router.get('/auth', async (req, res) => {
  */
 router.get('/callback', async (req, res) => {
   try {
-    // 使用官方 SDK 处理回调，获取 session（包含 accessToken）
     const callbackResponse = await shopify.auth.callback({
       rawRequest: req,
       rawResponse: res,
@@ -67,7 +63,6 @@ router.get('/callback', async (req, res) => {
     const tokenType = accessToken.startsWith('shpat_') ? 'offline' : accessToken.startsWith('shpua_') ? 'online' : 'unknown';
     console.log(`[OAuth] Token received via SDK, type: ${tokenType}, prefix: ${accessToken.substring(0, 10)}..., length: ${accessToken.length}`);
 
-    // 验证 token 是否真的能调用 Shopify Admin API（不校验前缀，直接试）
     let testShopInfo;
     try {
       const testResponse = await axios.get(`https://${shop}/admin/api/${config.shopify.apiVersion}/shop.json`, {
@@ -84,14 +79,12 @@ router.get('/callback', async (req, res) => {
       });
     }
 
-    // 获取店铺信息
     const shopInfo = await shopifyService.getShopInfo(
       shop,
       accessToken,
       config.shopify.apiVersion
     );
 
-    // 保存或更新店铺信息到数据库
     const shopData = await prisma.shop.upsert({
       where: { shopDomain: shop },
       update: {
@@ -113,7 +106,6 @@ router.get('/callback', async (req, res) => {
       },
     });
 
-    // 创建设置记录（如果不存在）
     await prisma.shopSetting.upsert({
       where: { shopId: shopData.id },
       update: {},
@@ -137,7 +129,6 @@ router.get('/callback', async (req, res) => {
         shop, accessToken, config.shopify.apiVersion
       );
 
-      // 删除旧版本的 ScriptTag
       for (const tag of existingTags) {
         if (tag.src && tag.src.includes('/translator-widget.js') && tag.src !== widgetScriptUrl) {
           try {
@@ -162,29 +153,9 @@ router.get('/callback', async (req, res) => {
       console.error(`[ScriptTag] Failed to inject for ${shop}:`, err.message);
     }
 
-    // 注册 Webhook
-    const webhookAddress = `${config.shopify.appUrl.replace(/\/translator$/, '')}/api/shopify/webhook`;
-    const webhookTopics = [
-      'products/update',
-      'products/delete',
-      'pages/update',
-      'pages/delete',
-      'articles/update',
-      'themes/update',
-    ];
+    // v6.0+：不再注册 Webhook（翻译系统已移除，不再需要监听 products/update 等事件）
+    // Google Translate 免费组件在前端实时翻译，无需后端预翻译和缓存
 
-    for (const topic of webhookTopics) {
-      try {
-        await shopifyService.createWebhook(
-          shop, accessToken, config.shopify.apiVersion, topic, webhookAddress
-        );
-        console.log(`[Webhook] Registered ${topic} for ${shop}`);
-      } catch (err) {
-        console.error(`[Webhook] Failed to register ${topic} for ${shop}:`, err.message);
-      }
-    }
-
-    // 重定向到管理页面
     res.redirect(`${config.shopify.appUrl}?shop=${shop}`);
 
   } catch (error) {
@@ -195,10 +166,9 @@ router.get('/callback', async (req, res) => {
 
 /**
  * @route POST /api/shopify/webhook
- * @desc 接收 Shopify Webhook 推送
+ * @desc 接收 Shopify Webhook 推送（v6.0+ 仅记录日志，不再处理翻译相关逻辑）
  */
 router.post('/webhook', async (req, res) => {
-  // Shopify 要求立即返回 200，否则认为失败
   res.status(200).send('OK');
 
   const topic = req.headers['x-shopify-topic'];
@@ -212,7 +182,6 @@ router.post('/webhook', async (req, res) => {
   console.log(`[Webhook] Received ${topic} from ${shopDomain}`);
 
   try {
-    // 查找店铺
     const shop = await prisma.shop.findUnique({
       where: { shopDomain },
     });
@@ -222,7 +191,6 @@ router.post('/webhook', async (req, res) => {
       return;
     }
 
-    // 记录 webhook 日志
     await prisma.webhookLog.create({
       data: {
         shopId: shop.id,
@@ -232,95 +200,8 @@ router.post('/webhook', async (req, res) => {
       },
     });
 
-    // 处理不同 topic
-    switch (topic) {
-      case 'products/update': {
-        const productId = req.body.id?.toString();
-        if (productId) {
-          const content = `${req.body.title || ''}_${req.body.body_html || ''}`;
-          const newHash = crypto.createHash('md5').update(content).digest('hex');
-
-          await prisma.translation.updateMany({
-            where: {
-              shopId: shop.id,
-              resourceType: 'product',
-              resourceId: productId,
-              NOT: { sourceHash: newHash },
-            },
-            data: { status: 'outdated' },
-          });
-
-          console.log(`[Webhook] Marked product ${productId} translations as outdated`);
-        }
-        break;
-      }
-
-      case 'products/delete': {
-        const deletedProductId = req.body.id?.toString();
-        if (deletedProductId) {
-          const result = await prisma.translation.deleteMany({
-            where: {
-              shopId: shop.id,
-              resourceType: 'product',
-              resourceId: deletedProductId,
-            },
-          });
-          console.log(`[Webhook] Deleted ${result.count} translations for removed product ${deletedProductId}`);
-        }
-        break;
-      }
-
-      case 'pages/update': {
-        const pageId = req.body.id?.toString();
-        if (pageId) {
-          const content = `${req.body.title || ''}_${req.body.body_html || ''}`;
-          const newHash = crypto.createHash('md5').update(content).digest('hex');
-
-          await prisma.translation.updateMany({
-            where: {
-              shopId: shop.id,
-              resourceType: 'page',
-              resourceId: pageId,
-              NOT: { sourceHash: newHash },
-            },
-            data: { status: 'outdated' },
-          });
-
-          console.log(`[Webhook] Marked page ${pageId} translations as outdated`);
-        }
-        break;
-      }
-
-      case 'pages/delete': {
-        const deletedPageId = req.body.id?.toString();
-        if (deletedPageId) {
-          const result = await prisma.translation.deleteMany({
-            where: {
-              shopId: shop.id,
-              resourceType: 'page',
-              resourceId: deletedPageId,
-            },
-          });
-          console.log(`[Webhook] Deleted ${result.count} translations for removed page ${deletedPageId}`);
-        }
-        break;
-      }
-
-      case 'themes/update': {
-        await prisma.translation.updateMany({
-          where: {
-            shopId: shop.id,
-          },
-          data: { status: 'outdated' },
-        });
-
-        console.log(`[Webhook] Theme updated, marked all translations as outdated for ${shopDomain}`);
-        break;
-      }
-
-      default:
-        console.log(`[Webhook] Unhandled topic: ${topic}`);
-    }
+    // v6.0+：不再处理翻译缓存的更新/删除逻辑
+    // Google Translate 在前端实时翻译，后端无需维护翻译状态
   } catch (error) {
     console.error('[Webhook Processing Error]', error.message);
   }
