@@ -1,0 +1,104 @@
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// 已授权的 Shopify 店铺信息
+model Shop {
+  id            Int      @id @default(autoincrement())
+  shopDomain    String   @unique @map("shop_domain")
+  accessToken   String   @map("access_token")
+  scope         String?
+  email         String?
+  name          String?
+  plan          String?
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  translations  Translation[]
+  settings      ShopSetting?
+
+  @@map("shops")
+}
+
+// 翻译内容缓存
+model Translation {
+  id              Int      @id @default(autoincrement())
+  shopId          Int      @map("shop_id")
+  resourceType    String   @map("resource_type") // product, page, blog, collection, theme
+  resourceId      String   @map("resource_id")   // Shopify 资源 ID 或 URL path
+  field           String   // title, description, body_html, 或 page_content
+  sourceText      String   @map("source_text") @db.Text
+  sourceHash      String   @map("source_hash")  // 原文 MD5 哈希，用于检测变化
+  sourceLang      String   @default("en") @map("source_lang")
+  targetLang      String   @map("target_lang")
+  translatedText  String   @map("translated_text") @db.Text
+  status          String   @default("translated") // translated | outdated | pending
+  isAuto          Boolean  @default(true) @map("is_auto")
+
+  // === 翻译引擎追踪（v1.2.0） ===
+  provider      String?  @map("provider")       // baidu / openai-compat / anthropic-compat
+  inputTokens   Int?     @map("input_tokens")   // AI 引擎输入 token
+  outputTokens  Int?     @map("output_tokens")  // AI 引擎输出 token
+
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@unique([shopId, resourceType, resourceId, field, targetLang])
+  @@index([shopId, targetLang, status])
+  @@map("translations")
+}
+
+// 店铺设置
+model ShopSetting {
+  id               Int      @id @default(autoincrement())
+  shopId           Int      @unique @map("shop_id")
+  widgetPosition   String   @default("bottom-right") @map("widget_position")
+  widgetColor      String   @default("#1976d2") @map("widget_color")
+
+  // === 语言配置优化（v1.1.0） ===
+  defaultLanguage  String   @default("en") @map("default_language")       // 店主设置的默认语言
+  autoDetect       Boolean  @default(false) @map("auto_detect")           // 是否自动检测浏览器语言
+  enabledLanguages String   @default("en,es,fr,ara,zh") @map("enabled_languages") // 启用的语言列表
+  customLanguages  String?  @map("custom_languages") @db.Text             // 自定义语言 JSON 数组
+
+  // === 翻译引擎配置（配置化翻译引擎 v1.2.0） ===
+  translateProvider  String?  @map("translate_provider")  // baidu / openai-compat
+  translateApiKey    String?  @map("translate_api_key")    // AES 加密存储
+  translateApiSecret String?  @map("translate_api_secret") // 百度需要 secret
+  translateModel     String?  @map("translate_model")      // 模型名（AI 提供商需要）
+  translateEndpoint  String?  @map("translate_endpoint")   // 自定义 API 地址
+
+  // 保留旧字段兼容（后续可清理）
+  autoTranslate   Boolean  @default(false) @map("auto_translate")
+  activeLanguages String   @default("en,es,fr,ara,zh") @map("active_languages")
+  debugToken      String?  @map("debug_token") // 店主调试授权 token
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  shop Shop @relation(fields: [shopId], references: [id], onDelete: Cascade)
+
+  @@map("shop_settings")
+}
+
+// Webhook 事件日志
+model WebhookLog {
+  id          Int      @id @default(autoincrement())
+  shopId      Int      @map("shop_id")
+  topic       String   // products/update, pages/update, themes/update
+  resourceId  String?  @map("resource_id")
+  payload     String?  @db.Text
+  processed   Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([shopId, topic])
+  @@map("webhook_logs")
+}

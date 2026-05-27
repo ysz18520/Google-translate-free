@@ -1,0 +1,16 @@
+node_modules/
+.env
+.env.local
+.env.production
+*.log
+logs/
+.DS_Store
+.vscode/
+.idea/
+dist/
+build/
+coverage/
+*.pid
+*.seed
+*.pid.lock
+部署信息.md
